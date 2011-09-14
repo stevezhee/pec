@@ -1,0 +1,36 @@
+Introducing the pec language and pec embedded compiler.
+
+The intent of pec is to provide a drop-in replacement for C, but with
+modern language features.  Pec is a procedural language with a
+functional/declarative feel.  Programming in pec is very similar to
+monadic programming in Haskell.  The primary use case for pec is to
+provide a productive environment for writing safe, performant embedded
+applications.
+
+Feature list
+  - Easy C integration
+  - No garbage collection
+  - Strong typing with Hindley-Milner type inference
+  - Safe pointers, no indexing out of bounds
+  - Variants, vectors, tuples, records, arbitrary sized integers
+  - User defined, polymorphic data structures
+  - Parametric polymorphism, ad-hoc polymorphism, laziness (strict by
+    default), user-defined operators, etc.
+  - Modules
+  - Compiles to LLVM (C planned)
+  - Haskell-ish syntax/layout
+  - BSD license
+
+Pec (the language and the compiler) is in the alpha stage of
+development.  The compiler is implemented in Haskell and has a very
+small codebase (thanks to several existing Haskell tools/libraries).
+
+You can download and install pec via cabal or access the git
+repository on github.
+
+Any feedback on the design and/or implementation of pec would be
+greatly appreciated :)
+
+Thanks,
+Brett
+brettletner at gmail dot com
