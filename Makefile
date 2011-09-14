@@ -7,7 +7,7 @@ install : build
 tests :
 	(cd test_cases;make)
 
-build : gen Setup.exe # config 
+build : Setup.exe # config 
 	./Setup.exe build
 
 config : ./Setup.exe
