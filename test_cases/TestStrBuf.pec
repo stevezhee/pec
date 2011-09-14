@@ -1,0 +1,46 @@
+module TestStrBuf exports all
+
+where
+
+import Prelude
+import StrBuf
+
+// String buffers, like char sbuf[N] in C except we don't have to worry about a missing null terminator
+
+main :: () -> W32
+main () = do
+  putLn "test StrBuf"
+  p = new (strbuf #5) // declaring an empty string buffer requires a singleton "Count" value
+  assert (strlen p == 0)
+  put p
+  assert (to_strbuf "BL" p) // to_strbuf returns True if all the characters were copied
+  put p
+  assert (strlen p == 2)
+  assert (to_strbuf "Brett" p)
+  assert (strlen p == 5)
+  put p
+  assert (not (to_strbuf "Letner" p)) // to_strbuf returns False if not all the characters were able to be copied.
+  assert (strlen p == 5)
+  put p
+  q = new (strbuf #6)
+  assert (to_strbuf "Letner" q)
+  assert (strlen q == 6)
+  put q
+  case strcmp p q of
+    LT -> assert True
+    EQ -> assert False
+    GT -> assert False
+  assert (to_strbuf "Letne" q)
+  puts (from_strbuf p)
+  puts (from_strbuf q)
+  case strcmp p q of
+    EQ -> assert True
+    _ -> assert False
+  to_strbuf "foo" p
+  put p
+  put q
+  strcpy p q
+  put q
+  assert (strcmp p q == EQ)
+  putLn "done"
+  0

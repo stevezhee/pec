@@ -1,0 +1,136 @@
+comment "//";
+comment "/*" "*/";
+
+entrypoints Module;
+
+layout "where", "do", "of";
+
+Module . Module ::= "module" Modid "exports" ExportDecl "where" "{" [TopDecl] "}";
+
+ExpAllD . ExportDecl ::= "all";
+ExpListD . ExportDecl ::= "(" [Export] ")";
+
+TypeEx . Export ::= Con Spec;
+VarEx . Export ::= Var;
+
+Neither . Spec ::= ;
+Decon . Spec ::= "(" "." ")";
+Both . Spec ::= "(" ".." ")";
+
+ImportD . TopDecl ::= "import" Modid AsSpec;
+ExternD . TopDecl ::= "extern" ExtNm Var "::" Type;
+TypeD . TopDecl ::= "type" Con [TyVar] "=" TyDecl;
+AscribeD . TopDecl ::= Var "::" Type;
+VarD . TopDecl ::= Var "=" Exp;
+ProcD . TopDecl ::= Var [Exp0] "=" Exp;
+
+AsAS . AsSpec ::= "as" Con ;
+EmptyAS . AsSpec ::= ;
+
+SomeNm . ExtNm ::= String;
+NoneNm . ExtNm ::= ;
+
+BlockE . Exp ::= "do" "{" [Exp5] "}";
+_ . Exp ::= Exp5;
+
+LetS . Exp5 ::= Exp4 "=" Exp; -- sugar which can only appear in a block and lhs only var
+LetE . Exp5 ::= "let" Exp4 "=" Exp "in" Exp;
+StoreE . Exp5 ::= Exp4 "<-" Exp;
+CaseE . Exp5 ::= "case" Exp "of" "{" [CaseAlt] "}";
+BranchE . Exp5 ::= "branch" "of" "{" [BranchAlt] "}";
+_ . Exp5 ::= Exp4;
+
+BinOpE . Exp4 ::= Exp3 USym Exp3;
+_ . Exp4 ::= Exp3;
+
+AppE . Exp3 ::= Exp3 Exp2;
+_ . Exp3 ::= Exp2;
+
+UnOpE . Exp2 ::= UnOp Exp1;
+_ . Exp2 ::= Exp1;
+
+IdxE . Exp1 ::= Exp1 "[" Exp "]";
+FldE . Exp1 ::= Exp1 "." Field;
+_ . Exp1 ::= Exp0;
+
+ArrayE . Exp0 ::= "Array" "[" [Exp] "]";
+RecordE . Exp0 ::= "{" [FieldD] "}";
+TupleE . Exp0 ::= "(" [Exp] ")";
+AscribeE . Exp0 ::= "(" Exp "::" Type ")";
+CountE . Exp0 ::= Count;
+VarE . Exp0 ::= Var;
+LitE . Exp0 ::= Lit;
+
+Load . UnOp ::= "@";
+
+CaseAlt . CaseAlt ::= CasePat "->" Exp;
+
+ConP . CasePat ::= Con Var;
+LitP . CasePat ::= Lit;
+VarP . CasePat ::= Var;
+
+BranchAlt . BranchAlt ::= "|" BranchPat "->" Exp;
+
+BoolBP . BranchPat ::= Exp4;
+DefaultBP . BranchPat ::= ;
+
+TyFun . Type ::= Type2 "->" Type;
+_ . Type ::= Type2;
+
+TyArray . Type2 ::= "Array" Type1 Type1;
+TyConstr . Type2 ::= Con [Type1];
+_ . Type2 ::= Type1;
+
+_ . Type1 ::= Type0;
+
+TyTuple . Type0 ::= "(" [Type] ")";
+TyCount . Type0 ::= Count;
+TyVarT . Type0 ::= TyVar;
+TyConstr0 . Type0 ::= Con;
+
+TyRecord . TyDecl ::= "{" [FieldT] "}";
+TyTagged . TyDecl ::= "|" [ConC];
+TySyn . TyDecl ::= Type;
+
+ConC . ConC ::= Con [Type0];
+
+FieldT . FieldT ::= Field "::" Type;
+
+CharL . Lit ::= Char;
+StringL . Lit ::= String;
+IntL . Lit ::= Number;
+FracL . Lit ::= Frac;
+EnumL . Lit ::= Con;
+
+FieldD . FieldD ::= Field "=" Exp;
+
+Var . Var ::= Lident;
+Con . Con ::= Uident;
+Modid . Modid ::= Uident;
+
+Field . Field ::= Lident;
+VarTV . TyVar ::= Lident;
+CntTV . TyVar ::= "#" Lident;
+
+token Frac ('-'? digit+ '.' digit+ ('e' '-'? digit+)?);
+
+token Uident (upper (letter | digit | '_')*);
+token Lident ((lower | '_') (letter | digit | '_')*);
+token USym (('!' | '#' | '$' | '%' | '&' | '*' | '+' | '-' | '.' | '/' | ':' | '<' | '=' | '>' | '?' | '@' | '\\' | '^' | '|' | '~')+);
+token Number ('-'? digit+);
+token Count ('#' digit+);
+
+separator Exp ",";
+separator FieldT ",";
+separator TyVar "";
+separator Type ",";
+separator Export ",";
+separator Type0 "";
+separator nonempty ConC "|";
+separator nonempty Exp0 "";
+separator nonempty FieldD ",";
+separator nonempty Type1 "";
+separator TopDecl ";";
+separator nonempty CaseAlt ";";
+separator nonempty BranchAlt ";";
+separator nonempty Exp5 ";";

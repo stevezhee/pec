@@ -1,0 +1,13 @@
+module TestLoad exports all
+
+where
+
+import Prelude
+
+main :: () -> I32
+main () = do
+  p = new 'a'
+  assert (@p == 'a')
+  putCh @p
+  putCh '\n'
+  0

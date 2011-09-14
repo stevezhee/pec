@@ -1,0 +1,140 @@
+module TestVariant exports all
+
+where
+
+import Prelude
+
+main :: () -> W32
+main () = do
+  testEnum ()
+  testNewtype ()
+  testNewtypePoly ()
+  testVariant ()
+  testUnit ()
+  0
+
+type Color = | Red | Blue | Green // the standard enum example
+
+unColor :: Color -> W32
+unColor c = case c of
+  Red -> 0
+  Blue -> 1
+  Green -> 2
+
+sColor :: Color -> IString
+sColor c = case c of // case on enums is by value
+  Red -> "Red"
+  Blue -> "Blue"
+  Green -> "Green"
+
+type Unit = | Unit // singleton type, isomorphic to ()
+
+unitf :: () -> Unit
+unitf () = Unit
+
+unita :: Unit -> ()
+unita _ = () // todo(?): unita Unit = ()
+
+testUnit :: () -> ()
+testUnit () = do
+  putLn "testunit"
+  x = Unit // singleton types are compiled into "void" in LLVM
+  unita x
+  unitf ()
+  unita Unit
+  putLn "done"
+
+testEnum :: () -> ()
+testEnum () = do
+  putLn "testEnum"
+  assert (Red == Red)
+  x = Green // enum types are compiled into unsigned ints in LLVM
+  putLn (sColor x)
+  assert (Green == x)
+  assert (x == Green)
+  assert (x != Blue)
+  p = new Blue
+  assert (@p == Blue)
+  putLn (sColor @p)
+  p <- Red
+  assert (@p != Blue)
+  putLn (sColor @p)
+  p <- x
+  putLn (sColor @p)
+  assert (@p == Green)
+  assert (unColor @p == 2)
+  assert (unColor Blue == 1)
+  case Red of
+    Green -> assert False
+    Red -> assert True
+    color -> assert (color != Blue)
+  case x of
+    Green -> assert True
+    Red -> assert False
+    Blue -> assert False
+  putLn "done"
+
+type Meters = | M W32 // newtype.  A variant with only one tag
+
+>instance EQ Meters_ where
+>  eq = unwrap2 eq
+>  ne = unwrap2 ne
+
+type MyA a = | My a // polymorphic newtype
+
+testNewtype :: () -> ()
+testNewtype () = do
+  putLn "testNewtype"
+  assert (M 7 == M 7)
+// newtypes are constructed by juxtaposition like in Haskell
+// newtypes are compiled into whatever the underlying type is in LLVM (i.e. the tag is eliminated)
+  x = M 12
+  assert (x == M 12)
+  p = new (M 7)
+  assert (@p != M 12)
+  assert (@p == M 7)
+  p <- M 47
+  assert (@p == M 47)
+  assert (47 == unwrap @p) // instead of using "case" to extract values from newtypes, pec provides the polymorphic "unwrap" function
+  p <- M 1
+  i = unwrap @p
+  assert (i == 1)
+  putLn "done"
+
+testNewtypePoly :: () -> ()
+testNewtypePoly () = do
+  putLn "testNewtypePoly"
+  x = My 'c'
+  p = new x
+  assert (unwrap @p == 'c')
+  q = new (My True)
+  assert (unwrap @q)
+  putLn "done"
+
+testVariant :: () -> ()
+testVariant () = do
+  putLn "testVariant"
+  p = new (Left False)
+  p <- Right 'c' // p :: Ptr (Either Bool Char)
+// variants must be accessed via a pointer
+  case p of
+    Left a -> do
+      assert @a
+    Right b -> do // b :: Ptr Char, not Char
+      putCh @b
+      assert (@b == 'c')
+  p <- Left True // store the value "Left True" in p
+  case p of
+    Left a -> assert @a
+    Right b -> do
+      putCh @b
+      assert False
+  q = new Nothing
+  case q of
+    Nothing -> assert True
+    Just _ -> assert False
+  q <- Just True
+  case q of
+    Just b -> assert @b
+    _ -> assert False
+  putLn "done"

@@ -1,0 +1,265 @@
+/* multi-line comment in pec
+   /* comments nest properly */
+*/
+
+// single line comment
+
+module TestPrims // module declaration
+
+exports all // export declaration
+
+where
+
+import Prelude // import declaration.  pulls in the declarations from Prelude.pec
+
+/* some top-level declarations.
+   non-function top-level decls are
+   simply inlined
+*/
+
+gchar :: Char // type signature like in Haskell
+gchar = 'a'
+    // char literal
+    // chars are are char, not ints like in C
+
+gi32 :: I32 // 32 bit integer
+gi32 = (3 :: I32) // type ascription
+// pec can have arbitrary sized ints and uints, like in llvm
+
+gw16 = (12 :: W16) // 16 bit word (unsigned int)
+gw16_2 = gw16 + 1
+
+gbool :: Bool // boolean type
+gbool = True
+// booleans aren't primitive, they are defined in Prelude.pec
+
+gistring :: IString
+gistring = "global istring"
+// string literals are IStrings, immutable strings
+// comparison is O(1)
+
+gSideEffect :: Bool
+gSideEffect = do
+  putLn "side effect" // print an IString to the screen
+  True
+// pec is impure.
+// This definition will get inlined
+
+// "do" notation, similar to haskell
+// in pec it is syntactic sugar for let [v=e] in r
+// where r is the "return" value
+// note the 0 at the end
+
+main :: () -> W32
+// main has type function of () to W32
+// where () is the type 'unit' (similar to void in C)
+main () = do // unit pattern match
+  putLn "starting test..."
+  testChar () // procedure call.  calls are made using juxtaposition like in Haskell, not tupling like in C
+  testI32 ()
+  testW16 ()
+  testBool ()
+  testIString ()
+  testDouble ()
+  putLn "...test complete"
+  0
+
+testI32 :: () -> ()
+testI32 () = do
+  putLn "testI32"
+  assert (gi32 == 3) // assert is just a library function
+  assert ((0 :: I32) == 0) // type ascription
+  putLn "done"
+
+testDouble :: () -> ()
+testDouble () = do
+  putLn "testDouble"
+  assert ((0 :: Double) >= 0)
+  assert (((-1) :: Float) >= (-1.0)) // floats aren't working at the moment
+// fixme: doesn't work. need ieee754 library or just some prelude functions?  assert (((-1) :: Float) >= (-1.1))
+  assert (gi32 == 3)
+  putLn "done"
+
+testW16 :: () -> ()
+testW16 () = do
+  putLn "testW16"
+  assert ((0 :: W16) == 0)
+  x = (4 :: W16) // name binding
+// names in pec are single static assignment (SSA)
+// i.e. x has a constant value
+
+// case statment, similar to Haskell
+// like a more powerful C switch statement
+  case x of
+    4 -> assert True // pattern on the left, expression on the right
+    _ -> assert False // default
+
+  case (7 :: W16) of // type ascription can be most anywhere
+    4 -> assert False
+    7 -> assert True
+    _ -> assert False
+
+  p = new (3 :: W16) // 'new' allocates memory on the stack and stores the given value there.  p :: Ptr W16
+
+  case @p of // '@' is the load operator.  It returns the value stored at the given location.
+    3 -> assert True
+    _ -> assert False
+
+  p <- 12 // '<-' is the store operator.  It takes a value and stores it at the given location.
+
+  case @p of
+    3 -> assert False
+    x -> assert (x == 12)
+
+  assert (gw16 == 12)
+  assert (gw16_2 == 13)
+  assert ((1 << 1) == (2 :: W16)) // left shift operator
+
+// branch expression.  like switch except each arm has a boolean operator.
+// Its purpose in life is to reduce the number of nested ifs.
+  branch of
+    | @p < 3 -> assert False // boolean expression on the left, value on the right
+    | False -> assert False
+    | -> assert True // all branch expressions must have a default
+
+  putLn "done"
+
+testBool :: () -> ()
+testBool () = do
+  putLn "testBool"
+  assert True
+  assert (not False)
+  assert (True == True)
+  assert (gbool == True)
+  assert gSideEffect // will output to the screen
+  assert gSideEffect // will also output to the screen
+  x = gSideEffect // will output to the screen
+// x is evaluated immediately
+  assert x // won't output anything
+  assert x // won't output anything
+  putLn "done"
+
+testIString :: () -> ()
+testIString () = do
+  putLn "testIString"
+ // IStrings are just represented in a global table,
+ // so they can be compared by their index value
+  assert ("hi" == "hi")
+  assert (gistring == "global istring")
+  case "hi" of
+    "bye" -> assert False
+    "hi" -> assert True
+    s -> do // default pattern match, so that we can use the case scrutinee
+      putLn s
+      assert False
+  s = "blah" // at a different scope than the previous "s".  This feature might be removed in the future.
+  case s of
+    "blah" -> assert (s == "blah")
+    _ -> assert False
+  putLn "done"
+
+type MyChar a = Char // polymorphic type
+
+testChar :: () -> ()
+testChar () = do // character literals
+  putLn "testChar"
+  assert (is_lower 'a')
+  assert (is_upper 'A')
+  assert (gchar == 'a')
+  putCh 't'
+
+  if ('m' == 'm') (putCh 't') (putCh 'f')
+
+  case 'm' of
+    'n' -> putCh 'n'
+    'm' -> putCh 't'
+    v -> putCh v
+    
+  case 't' of
+    'm' -> putCh 'm'
+    'n' -> putCh 'n'
+    v -> putCh v
+    
+  x = 't'
+  putCh x
+
+// "if" function call.
+// "if" is not a primitive, it is defined using the "library" DSL, so that it can be polymorphic and lazy
+// see "if_" in Prelude.pec
+
+  if (x != 'm') (putCh 't') (putCh 'f')
+
+  case x of
+    'm' -> putCh 'm'
+    'n' -> putCh 'n'
+    v -> putCh v
+    
+  p = new 't'
+  
+  putCh @p
+
+  if (@p == 'm')
+    (putCh 'f')
+    (putCh 't')
+
+  case @p of
+    'm' -> putCh 'm'
+    'n' -> putCh 'n'
+    v -> do
+      putCh @p
+      putCh v
+  
+  p <- 'T'
+
+  putCh @p
+
+  assert (@p == 'T')
+
+  putCh @p
+  
+  p <- x
+  
+  putCh @p
+  
+  p <- @p
+  
+  putCh @p
+  
+  p <- case 'l' of
+    'l' -> 't'
+    'n' -> 'n'
+    _ -> 'a'
+  
+  putCh @p
+  
+  p <- getT ()
+  
+  putCh @p
+
+  let c = ('a' :: MyChar W32) in putCh c // let expression
+
+  (v) = 'c' // parens used for grouping
+  putCh v
+  assert (is_lower v)
+  putCh (to_upper v)
+  putCh (to_lower (to_upper @p))
+  assert (is_upper (to_upper v))
+  assert (funptr is_lower 'c') // making a call using a function pointer
+  assert (funptr is_upper 'C') // again, but with different arguments
+  w = funptr2 to_lower 'A'
+  x = funptr2 to_upper 'a'
+  putCh w
+  putCh x
+  assert (is_lower w)
+  assert (is_upper x)
+  putCh '\n'
+  putLn "done"
+
+getT :: () -> Char
+getT (()) = 'T'
+
+funptr :: (Char -> Bool) -> Char -> Bool // type of a function that takes a function pointer argument, a character, and returns a bool
+funptr f c = f c
+
+funptr2 :: (Char -> Char) -> Char -> Char
+funptr2 f c = f c

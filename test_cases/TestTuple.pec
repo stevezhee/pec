@@ -1,0 +1,119 @@
+module TestTuple exports all
+
+where
+
+import Prelude
+
+// () is a tuple with no elements.
+// it gets compiled as "void" in the LLVM code
+main :: () -> W32
+main () = do
+  testUnit ()
+  testPair ()
+  testTuple ()
+  testRecord ()
+  0
+
+testUnit :: () -> ()
+testUnit () = do
+  putLn "testUnit"
+  putLn "done"
+
+pairf :: Ptr (Char, Bool) -> () // pairf takes a pointer to a tuple containing a Char and a Bool and returns ()
+pairf (a,b) = do // tuple pattern match on left hand side
+  putCh @a
+  assert (@a == 'a')
+  assert @b
+
+testPair :: () -> ()
+testPair () = do
+  p = new ('a',True) // p :: Ptr (Char, Bool)
+
+  (c,b) = p // pattern match.  note that c :: Ptr Char and b :: Ptr Bool
+  putCh @c
+  putCh @p.fst // using record syntax to extract the first element of a pair
+// note that it returns a pointer to the element within the record
+  putCh @(fst p) // using function syntax for the same thing
+  assert @b
+
+  c <- 'b'
+  b <- False
+  putCh @c
+  putCh @p.fst
+  putCh @(fst p)
+  assert (not @b)
+
+  p.fst <- 'c'
+  p.snd <- True
+  putCh @c
+  putCh @p.fst
+  putCh @(fst p)
+  assert @p.snd
+  assert @b
+  pairf (new ('a',True))
+  putLn "done"
+
+tuplef :: Ptr (Bool, Char, W32) -> ()
+// a triple of Bool, Char, and W32
+// n-ary tuples in pec are syntactic sugar for pairs, so
+// this is exactly the same as (Bool, (Char, W32))
+tuplef p = do
+  (x,y,z) = p // sugar for (x,(y,z))
+  assert @x
+  putCh @y
+  assert (@y == 'c')
+  assert (@z == 7)
+
+testTuple :: () -> ()
+testTuple () = do
+  putLn "testTuple"
+  t3 = ('c',True,"asdf") // sugar for ('c', (True, "asdf"))
+  p = new t3
+  putCh @p.fst
+  assert @p.snd.fst // record syntax
+  putLn @p.snd.snd
+  (x,y,z) = p
+  putLn @z
+  assert @y
+  (a,(b,c)) = p
+  putLn @c
+  assert @b
+  tuplef (new (True, 'c', 7))
+  putLn "done"
+
+type Person = // the standard record example
+  { name :: IString
+  , middle_initial :: Char
+  , city :: IString
+  , zipcode :: W32 }
+// order of elements doesn't matter, so this is exactly the same as
+// type Person =
+//   { zipcode :: W32
+//   , city :: IString
+//   , middle_initial :: Char
+//   , name :: IString
+//   }
+
+type Stuff = { stuff :: Char }
+
+testRecord :: () -> ()
+testRecord () = do
+  putLn "testRecord"
+  x = { stuff = 'a' }
+  p = new x
+  assert (@p.stuff == 'a')
+  putCh @p.stuff
+  p.stuff <- 'b'
+  assert (@p.stuff == 'b')
+  putCh @p.stuff
+  y = { name = "Brett", city = "Beverly Hills", zipcode = 90210, middle_initial = 'A' }
+// since pec has side effects, record labels are sorted prior to execution.
+// having a side effecting function within a record initilization is considered bad form :)
+
+  q = new y
+  putLn @q.name
+  putLn @q.city
+  assert (@q.zipcode == 90210)
+  q.city <- "BC"
+  assert (@q.city == "BC")
+  putLn "done"

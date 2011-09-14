@@ -1,0 +1,82 @@
+The pec programming language FAQ
+
+Q: How mature is pec?
+
+A: It's not :) Good ideas/help is appreciated in all areas, from
+language design, implementation, test cases, etc.  That being said,
+you should be able to use the pec compiler to write fairly
+sophisticated prototype applications (see examples in the test case
+directory).  Comments/questions/bug reports can be sent to brettletner
+at gmail dot com.
+
+Q:  Where did the name 'pec' come from?
+
+A: A long time ago it stood for Pure Embedded Compiler.  pec is no
+longer pure, but I still liked the name.  Now I guess it stands for
+pec embedded compiler :)
+
+Q: Why isn't pec pure?
+
+A: Mostly I wanted to make it easier for C programmers to migrate.  A
+pure language with the same target market seems like a fine thing,
+though.
+
+Q: How does the type system prevent out of bounds array indexing?
+
+A: It uses Haskell classes and built-in "Count" types.  See the paper
+"Lightweight static capabilities" by Kiselyov and Shan for more
+information.
+
+Q: Can I use the type system to prevent other common sources of
+errors, e.g. divide by zero?
+
+A: Yes.
+
+Q: Why no garbage collection?
+
+A: GC is generally (right or wrong) frowned upon in embedded
+development.  It makes the run-time system more complicated and
+makes integration with other GC'd languages more difficult.  A GC'd
+language with the same target market seems like a fine thing, though.
+
+Q: Why no recursion?
+
+A: Recursion is generally (right or wrong) frowned upon in embedded
+development.  Also, not having recursion leaves open the possibility
+of compiling the whole program into a state machine.
+
+Q: Why no closures?
+
+A: Pec doesn't have a heap, so it can't have "upward"
+closures.  "Downward" closures may be added in the future.
+
+Q: Why no objects?
+
+A: Personal preference.
+
+Q: Why no parallelism/concurrency?
+
+A: I just haven't thought about it yet.  My best guess is that it will
+eventually be based on STM, but help is needed here.
+
+Q: Why no operator precedence?
+
+A: It is better style to just put the parens in and removes all code
+review discussion as to whether you should have parens or not.  Also,
+I was too lazy to implement it :)
+
+Q: This "safe" pointer isn't safe at all, what gives?
+
+foo = do
+  p = new (Just 'a')
+  case p of
+    Nothing -> ()
+    Just c -> do
+      p <- Nothing
+      putCh @c
+
+A: The second assignment to p (i.e. p <- Nothing) should be disallowed
+while c is in scope.  The compiler currently doesn't prevent this (and
+other similar errors such as returning a pointer to the (soon to be
+invalidated) stack).  If anyone has an idea on how to prevent this I'd
+love to hear it.

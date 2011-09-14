@@ -1,0 +1,50 @@
+module Stack
+
+exports (Stack, stack, push, pop, is_empty, is_full)
+// explicit export list
+
+where
+
+import Prelude
+
+type Stck #cnt a = { height :: W32, data :: Array cnt a }
+// stacks are polymorphic in their size and what they contain
+
+type Stack #cnt a = Stck cnt a
+
+>type Stack cnt a = Stack_ cnt a
+>
+>stack_ :: (Count cnt, Typed cnt, Typed a) => Term (cnt -> Stack cnt a)
+>stack_ = lam_ $ \_ -> lift $ do
+>  p <- eval $ alloca unused
+>  eval_ $ store (height_get p) (int 0)
+>  return $ load p
+>
+>push_ :: (Count cnt, Typed cnt, Typed a) =>
+>  Term (a -> Ptr (Stack cnt a) -> Bool_)
+>push_ = lam2_ $ \a (p :: Term (Ptr (Stack cnt a))) ->
+>  app3 if_ (app is_full_ p)
+>    false_
+>    (lift (do i <- eval $ load (height_get p)
+>              evalv $ store (idx (data_get p) (cast i)) a
+>              evalv $ store (height_get p) (add i (int 1))
+>              return true_
+>          ))
+> 
+>pop_ :: (Count cnt, Typed cnt, Typed a) =>
+>  Term (Ptr (Stack cnt a) -> Maybe_ a)
+>pop_ = lam_ $ \p -> app3 if_ (app is_empty_ p)
+>  nothing_
+>  (lift (do i <- eval $ sub (load (height_get p)) (int 1)
+>            evalv $ store (height_get p) i
+>            return $ app just_ (load (idx (data_get p) (cast i)))
+>        ))
+>
+>is_empty_ :: (Count cnt, Typed cnt, Typed a) =>
+>  Term (Ptr (Stack cnt a) -> Bool_)
+>is_empty_ = lam_ $ \p -> eq (load (height_get p)) (int 0)
+>
+>is_full_ :: (Count cnt, Typed cnt, Typed a) =>
+>  Term (Ptr (Stack cnt a) -> Bool_)
+>is_full_ = lam_ $ \(p :: Term (Ptr (Stack cnt a))) ->
+>  eq (load (height_get p)) (int $ countof (unused :: cnt))

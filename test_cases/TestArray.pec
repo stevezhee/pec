@@ -1,0 +1,69 @@
+module TestArray exports all
+
+where
+
+import Prelude
+
+// fixed sized arrays
+
+garr = Array [ 'a', 'b', 'c' ]
+
+main :: () -> W32
+main () = do
+  testSingleDim ()
+  testMultiDim ()
+  0
+
+testSingleDim () = do
+  putLn "testSingleDim"
+  arr = new Array [ 'x', 'y', 'z' ]
+  assert (@arr[0] == 'x')
+  putCh @arr[0] // index operator.  returns pointer to given index
+  putCh @arr[1]
+  putCh @arr[2]
+// the index operator is type safe, i.e. putCh @arr[3] will fail to compile.
+  arr[0] <- 'a' // store an 'a' at element 0
+  arr[1] <- 'b'
+  arr[2] <- 'c'
+  putCh @arr[0]
+  putCh @arr[1]
+  putCh @arr[2]
+  assert (@arr[0] == 'a')
+  arr <- Array [ 'x', 'y', 'z' ]
+  putCh @arr[0]
+  putCh @arr[1]
+  putCh @arr[2]
+  assert (@arr[2] == 'z')
+  assert (@(new garr)[1] == 'b')
+  arr2 = new (array #5 'c')
+  assert (@arr2[4] == 'c')
+  putCh @arr2[0]
+  putCh @arr2[4]
+  putLn "done"
+
+arrayf :: Ptr (Array #2 Bool) -> ()
+arrayf arr = do
+  assert @arr[0]
+  assert (not @arr[1])
+
+testMultiDim () = do
+  putLn "testMultiDim"
+  arr = new Array [ Array [ 'a', 'b' ]
+                  , Array [ 'c', 'd' ]
+                  , Array [ 'e', 'f' ] ]
+  putCh @arr[0][0]
+  putCh @arr[0][1]
+  putCh @arr[1][0]
+  putCh @arr[1][1]
+  putCh @arr[2][0]
+  putCh @arr[2][1]
+  assert True
+  (a :: Ptr Bool) = new True
+  assert @a
+  b = new Array [ True ]
+  assert @b[0]
+  x = new Array [ Array [ Array [ True ] ], Array [ Array [ False ] ] ]
+  assert @x[0][0][0]
+  assert (not @x[1][0][0])
+  () = arrayf (new (Array [ True, False ]))
+  (putLn "done" :: ())

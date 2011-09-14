@@ -1,0 +1,287 @@
+module Prelude
+
+exports all
+
+where
+
+type W8 = W #256 //singleton "Count" type.  In this case, used to specify a word that holds 256 values.
+type W16 = W #65536
+type I32 = I #4294967296 // 32 bit int
+
+type Bool = | False | True
+// enum type
+// the "|" is used to specify "or"
+
+type Maybe a = | Nothing | Just a // polymorphic variant
+// order doesn't matter
+// type Maybe a = | Just a | Nothing would be compiled exactly the same way
+
+type Either a b = | Left a | Right b // polymorphic variant
+
+type Ordering = | LT | EQ | GT // another enum
+
+extern putchar :: Char -> ()
+// external C call
+// name on the left, type on the right
+
+extern puts :: Ptr Char -> ()
+extern exit :: I32 -> ()
+
+to_ordering :: I32 -> Ordering
+to_ordering x = branch of
+  | x < 0 -> LT
+  | x > 0 -> GT
+  | -> EQ
+
+putCh :: Char -> ()
+putCh c = putchar c
+
+assert :: Bool -> ()
+assert x = when (not x)
+  (do
+    putLn "assertion failed"
+    exit -1
+  )
+// "when" is not a primitive, it is a library function, see "when_" below
+
+not :: Bool -> Bool
+not x = if x False True
+
+putLn :: IString -> ()
+putLn x = puts (from_istring x)
+
+is_upper :: Char -> Bool
+is_upper c = (c >= 'A') && (c <= 'Z') // operators don't have precedence, parens are required
+
+is_lower :: Char -> Bool
+is_lower c = (c >= 'a') && (c <= 'z')
+
+is_digit :: Char -> Bool
+is_digit c = (c >= '0') && (c <= '9')
+
+to_lower :: Char -> Char
+to_lower c = branch of
+  | is_upper c -> chr (ord c + 32)
+  | -> c
+
+to_upper :: Char -> Char
+to_upper c = branch of
+  | is_lower c -> chr (ord c - 32)
+  | -> c
+
+// inline Haskell "library" DSL code
+
+>import Pec.Base
+>import Data.List
+>
+>type CntW8 = Cnt256
+>type W8 = W CntW8
+>type Char_ = Char
+>type Ptr_ a = Ptr a
+>type IString_ = IString
+>type W32_ = W32
+>type Float_ = Float
+>type Double_ = Double
+>
+>class Typed a => ARITH a where
+>  add :: Term a -> Term a -> Term a
+>  sub :: Term a -> Term a -> Term a
+>  mul :: Term a -> Term a -> Term a
+>  adiv :: Term a -> Term a -> Term a
+>  arem :: Term a -> Term a -> Term a
+>
+>class Typed a => BITS a where
+>  shl :: Term a -> Term a -> Term a
+>  shr :: Typed a => Term a -> Term a -> Term a
+>  band :: Term a -> Term a -> Term a
+>  bor :: Term a -> Term a -> Term a
+>  xor :: Term a -> Term a -> Term a
+>  -- support ashr?
+>
+>class Typed a => ORD a where
+>  gt :: Term a -> Term a -> Term Bool_
+>  ge :: Term a -> Term a -> Term Bool_
+>  lt :: Term a -> Term a -> Term Bool_
+>  le :: Term a -> Term a -> Term Bool_
+>
+>class Typed a => EQ a where
+>  eq :: Term a -> Term a -> Term Bool_
+>  eq = prim2 "icmp eq"
+>  ne :: Term a -> Term a -> Term Bool_
+>  ne = prim2 "icmp ne"
+>
+>class (Typed a, Show a) => FRAC a where
+>  frac :: a -> Term a
+>  frac = val . show
+>
+// operators must be defined using the DSL
+// The '$' is tacked on by the compiler in order to avoid name clashes.
+>(@$) :: Typed a => Term (Ptr a) -> Term a
+>(@$) = load
+>
+>(>$) :: ORD a => Term a -> Term a -> Term Bool_
+>(>$) = gt
+>
+>(>=$) :: ORD a => Term a -> Term a -> Term Bool_
+>(>=$) = ge
+>
+>(<$) :: ORD a => Term a -> Term a -> Term Bool_
+>(<$) = lt
+>
+>(<=$) :: ORD a => Term a -> Term a -> Term Bool_
+>(<=$) = le
+>
+>(+$) :: ARITH a => Term a -> Term a -> Term a
+>(+$) = add
+>
+>(-$) :: ARITH a => Term a -> Term a -> Term a
+>(-$) = sub
+>
+>(*$) :: ARITH a => Term a -> Term a -> Term a
+>(*$) = mul
+>
+>(/$) :: ARITH a => Term a -> Term a -> Term a
+>(/$) = adiv
+>
+>(%$) :: ARITH a => Term a -> Term a -> Term a
+>(%$) = arem
+>
+>(==$) :: EQ a => Term a -> Term a -> Term Bool_
+>(==$) = eq
+>
+>(!=$) :: EQ a => Term a -> Term a -> Term Bool_
+>(!=$) = ne
+>
+>(<<$) :: BITS a => Term a -> Term a -> Term a
+>(<<$) = shl
+>
+>(>>$) :: BITS a => Term a -> Term a -> Term a
+>(>>$) = shr
+>
+>(&$) :: BITS a => Term a -> Term a -> Term a
+>(&$) = band
+>
+>(|$) :: BITS a => Term a -> Term a -> Term a
+>(|$) = bor
+>
+>(^$) :: BITS a => Term a -> Term a -> Term a
+>(^$) = xor
+>
+>(&&$) :: Term Bool_ -> Term Bool_ -> Term Bool_
+>(&&$) x y = Lift $ do
+>  a <- eval x
+>  b <- eval y
+>  return $ switch a
+>    [(false_tag, false_alt (\ _ -> false_))
+>    ,(defaulttag, \ _ -> b)]
+>
+>(||$) :: Term Bool_ -> Term Bool_ -> Term Bool_
+>(||$) x y = Lift $ do
+>  a <- eval x
+>  b <- eval y
+>  return $ switch a
+>    [(true_tag, true_alt (\ _ -> true_))
+>    ,(defaulttag, \ _ -> b)]
+>
+// ad-hoc polymorphism, using Haskell classes
+>instance Count cnt => EQ (I cnt)
+>instance Count cnt => EQ (W cnt)
+>instance EQ Char
+>instance EQ IString
+>instance (EQ a, EQ b) => EQ (a,b)
+>instance INT Double where int = frac . fromInteger
+>instance INT Float where int = frac . fromInteger
+>instance FRAC Double
+>instance FRAC Float
+>
+>instance Count cnt => BITS (W cnt) where
+>  shl = prim2 "shl"
+>  shr = prim2 "lshr"
+>  band = prim2 "and"
+>  bor = prim2 "or"
+>  xor = prim2 "xor"
+>
+>instance Count cnt => ORD (W cnt) where
+>  gt = prim2 "icmp ugt"
+>  ge = prim2 "icmp uge"
+>  lt = prim2 "icmp ult"
+>  le = prim2 "icmp ule"
+>
+>instance ORD Char where
+>  gt = prim2 "icmp ugt"
+>  ge = prim2 "icmp uge"
+>  lt = prim2 "icmp ult"
+>  le = prim2 "icmp ule"
+>
+>instance Count cnt => ORD (I cnt) where
+>  gt = prim2 "icmp sgt"
+>  ge = prim2 "icmp sge"
+>  lt = prim2 "icmp slt"
+>  le = prim2 "icmp sle"
+>
+>instance ORD Double where
+>  gt = prim2 "fcmp ogt"
+>  ge = prim2 "fcmp oge"
+>  lt = prim2 "fcmp olt"
+>  le = prim2 "fcmp ole"
+>
+>instance ORD Float where
+>  gt = prim2 "fcmp ogt"
+>  ge = prim2 "fcmp oge"
+>  lt = prim2 "fcmp olt"
+>  le = prim2 "fcmp ole"
+>
+>instance Count cnt => ARITH (I cnt) where
+>  add = prim2 "add"
+>  sub = prim2 "sub"
+>  mul = prim2 "mul"
+>  adiv = prim2 "sdiv"
+>  arem = prim2 "srem"
+>
+>instance Count cnt => ARITH (W cnt) where
+>  add = prim2 "add"
+>  sub = prim2 "sub"
+>  mul = prim2 "mul"
+>  adiv = prim2 "udiv"
+>  arem = prim2 "urem"
+>
+>instance ARITH Double where
+>  add = prim2 "fadd"
+>  sub = prim2 "fsub"
+>  mul = prim2 "fmul"
+>  adiv = prim2 "fdiv"
+>  arem = prim2 "frem"
+>
+>instance ARITH Float where
+>  add = prim2 "fadd"
+>  sub = prim2 "fsub"
+>  mul = prim2 "fmul"
+>  adiv = prim2 "fdiv"
+>  arem = prim2 "frem"
+>
+>eq_unit = \_ _ -> true_
+>ne_unit = \_ _ -> false_
+>
+>instance EQ () where
+>  eq = eq_unit
+>  ne = ne_unit
+>
+// polymorphic function
+// note that the '_' is added to the end of pec names to avoid name clashes
+>array_ :: (Count cnt, Typed cnt, Typed a) => Term (cnt -> a -> Array cnt a)
+>array_ = lam2_ $ \(cnt :: Term cnt) x -> Lift $ do
+>  a <- eval x
+>  return $ array cnt $ genericReplicate (countof (unused :: cnt)) a
+>
+>ord_ :: Term (Char -> W8)
+>ord_ = lam_ cast
+>
+>chr_ :: Term (W8 -> Char)
+>chr_ = lam_ cast
+>
+>if_ :: Typed a => Term (Bool_ -> a -> a -> a)
+>if_ = lam3_ $ \f g h ->
+>  switch f [(true_tag, \_ -> g), (false_tag, \_ -> h)]
+>
+>when_ :: Term (Bool_ -> () -> ())
+>when_ = lam2_ $ \a b -> app3 if_ a b unit

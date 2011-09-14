@@ -1,0 +1,55 @@
+todo
+- do language design doc
+- do compiler architecture doc
+- add qualified names
+- make read only pointers
+- "Show" instances
+- "Eq" instances
+- allow operators in export lists
+- add import "as"
+- add import list(?)
+- make the inline Haskell code (i.e. '>') play nice with comments
+- implement downward closures(?)
+- properly create .ll files (i.e. with declare statements)
+- implement puts that doesn't tack on a newline
+- haddock'ize modules
+- write more example code (project euler or language shootout)
+- add -i flag to search other directories
+- add c code generation
+- report llvm bug
+- add state machine optimization(?)
+- don't rebuild files that haven't changed (unfortunately the istrings complicate things)
+- add warning when _ is used as a name
+- add check to ensure that variables are SSA
+- add check to prevent recursion
+
+done
+- datatype: string buffer
+- datatype: stack
+- implement prelude/ other library functions
+- generate Counts, etc. in separate files
+- get test infrastructure in place
+- get coverage infrastructure in place
+- make Bool work in case exp (make it constructed like all the rest)
+- get arrays working
+- add ascription
+- fix operator precedence
+- add top level type declarations for functions
+- make code generation easier to read/debug
+- make pretty printer robust
+- call external Haskell pretty-printer for generated code
+- consider removing module keyword.  Decided to keep it.  That way we can process streams, not just files.
+- add the ability to generate arbitrary sized integers and words (e.g. I16, W64) (add boilerplate generation to pec.hs)
+- add exports
+- get variants working
+- get tuples working
+- get records working
+- added arithmetic ops
+- added bitwise ops
+- make top level (non-procedure) values work
+- add array initializer that takes a count and a value
+- implement function pointers
+- take all non-essential things out of Base and put them into pec libraries
+- make library implementation easier by integrating haskell code into .pec files
+- create separate .ll files and cat them together
+- add rebuild all flag

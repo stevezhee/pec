@@ -1,0 +1,39 @@
+module TestStack exports all
+
+where
+
+// polymorphic Stack implementation
+
+import Prelude
+import Stack
+
+main :: () -> W32
+main () = do
+  putLn "test Stack"
+  p = new (stack #3) // stacks must be given a size
+  case new (pop p) of
+    Nothing -> assert True
+    Just _ -> assert False
+  assert (push 'a' p)
+  case new (pop p) of
+    Nothing -> assert False
+    Just c -> do
+      putCh @c
+      assert (@c == 'a')
+  assert (is_empty p)
+  assert (push 'a' p)
+  assert (push 'b' p)
+  assert (push 'c' p)
+  assert (is_full p)
+  assert (not (push 'd' p))
+  mc = new (pop p)
+  case mc of
+    Nothing -> assert False
+    Just c -> do
+      putCh @c
+      assert (@c == 'c')
+  mc <- pop p
+  mc <- pop p
+  assert (is_empty p)
+  putLn "done"
+  0
