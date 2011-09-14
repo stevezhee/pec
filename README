@@ -26,7 +26,7 @@ development.  The compiler is implemented in Haskell and has a very
 small codebase (thanks to several existing Haskell tools/libraries).
 
 You can download and install pec via cabal or access the git
-repository on github.
+repository on github (git@github.com:stevezhee/pec.git).
 
 Any feedback on the design and/or implementation of pec would be
 greatly appreciated :)
