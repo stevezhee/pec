@@ -4,7 +4,6 @@ all : clean TestStack.exe TestStrBuf.exe TestPrims.exe TestTuple.exe TestVariant
 	pec
 	pec --version
 	pec --help
-	mv *.tix ..
 
 %.exe : %.pec
 	pec -k $<

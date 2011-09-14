@@ -1,4 +1,4 @@
-all : config install tests cov
+all : config install tests # cov
 	wc -l Main.hs Pec/Base.hs
 
 install : build
@@ -16,6 +16,7 @@ config : ./Setup.exe
 EXCLUDE=--exclude=Language.Pec.Print --exclude=Language.Pec.Abs --exclude=Language.Pec.Par --exclude=Language.Pec.Lex --exclude=Language.Pec.ErrM --exclude=Language.Pec.Layout
 
 cov :
+	mv test_cases/*.tix .
 	hpc markup pec $(EXCLUDE)
 	hpc report pec $(EXCLUDE)
 
@@ -40,4 +41,5 @@ clean :
 	rm -rf dist .hpc pec-0.1
 
 vclean : clean
+	(cd test_cases;make vclean)
 	rm -rf Language

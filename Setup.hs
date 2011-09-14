@@ -1,3 +1,5 @@
+#! /usr/bin/env runhaskell
+
 -- The pec embedded compiler
 -- Copyright 2011, Brett Letner
 

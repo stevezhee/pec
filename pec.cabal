@@ -22,19 +22,25 @@ Build-type: Simple
 
 Extra-source-files: Pec.cf
 
-Cabal-version: >=1.2
+data-files: Makefile, FAQ, Pec/Makefile, DESIGN, test_cases/Makefile, test_cases/TestStack.pec, test_cases/Prelude.pec, test_cases/TestLoad.pec, test_cases/Stack.pec, test_cases/StrBuf.pec, test_cases/TestPrims.pec, test_cases/TestTuple.pec, test_cases/TestStrBuf.pec, test_cases/TestVariant.pec, test_cases/TestArray.pec, pec.cabal, THANKS, README, TODO, LICENSE, Language/Pec/Doc.html
+
+Cabal-version: >= 1.6
+
+source-repository head
+  type: git
+  location: git://github.com/stevezhee/pec.git
 
 Library
   Exposed-modules: Pec.Base
   Build-depends: base
-  GHC-Options: -fhpc
+--  GHC-Options: -fhpc
 
 Executable pec
   Main-is: Main.hs
   
-  Build-depends: base, derive, array, filepath, cmdargs, mtl, process, directory
+  Build-depends: base >= 4 && < 5, derive, array, filepath, cmdargs, mtl, process, directory
   
   Other-modules: Language.Pec.Lex, Language.Pec.Layout, Language.Pec.ErrM, Language.Pec.Abs, Language.Pec.Par, Language.Pec.Print
 
 --   Build-tools: happy, alex
-  GHC-Options: -fhpc
+  -- GHC-Options: -fhpc
