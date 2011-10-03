@@ -10,12 +10,14 @@ import Control.Monad.State
 import Data.Char
 import Data.Either
 import Data.List
+import Distribution.Text
 import GHC.IO.Exception
 import Language.Pec.Abs
 import Language.Pec.ErrM
 import Language.Pec.Layout
 import Language.Pec.Par
 import Language.Pec.Print
+import Paths_pec
 import System.Console.CmdArgs
 import System.Directory
 import System.FilePath
@@ -26,6 +28,7 @@ data Args = Args
   { files :: [FilePath]
   , keep_tmp_files :: Bool
   , rebuild_all :: Bool
+  , idir :: [FilePath]
   } deriving (Show, Data, Typeable)
 
 argsDesc :: Args
@@ -33,10 +36,11 @@ argsDesc = Args
   { files = def &= args
   , keep_tmp_files = def &= help "Keep temporary files"
   , rebuild_all = def &= help "Rebuild all files"
+  , idir = def &= typDir &= help "Import directory"
   } &= summary summry &= program prog
 
 summry :: String
-summry = prog ++ " v" ++ vers ++ ", " ++ copyright
+summry = prog ++ " v" ++ display version ++ ", " ++ copyright
 
 prog :: String
 prog = "pec"
@@ -44,20 +48,21 @@ prog = "pec"
 copyright :: String
 copyright = "(C) Brett Letner 2011"
 
-vers :: String
-vers = "0.1"
-
-initSt :: Args -> St
-initSt x = St
-  { visited = []
-  , modified = False
-  , rebuild = rebuild_all x
-  , not_visited = map (\fn -> dropExtension fn ++ "_") $ files x
-  , strings = []
-  , counts = []
-  , keep_tmps = keep_tmp_files x
---   , mains = []
-  }
+initSt :: Args -> IO St
+initSt x = do
+  prel <- getDataFileName "lib/Prelude.pec"
+  return $ St
+    { visited = []
+    , modified = False
+    , rebuild = rebuild_all x
+    , not_visited = map (\fn -> dropExtension fn ++ "_") $ files x
+    , strings = []
+    , counts = []
+    , keep_tmps = keep_tmp_files x
+  --   , mains = []
+    , lib_dir = takeDirectory prel
+    , imp_dirs = idir x
+    }
 
 type M a = StateT St IO a
 
@@ -69,6 +74,8 @@ data St = St
   , strings :: [String]
   , counts :: [Integer]
   , keep_tmps :: Bool
+  , lib_dir :: FilePath
+  , imp_dirs :: [FilePath]
 --   , mains :: [FilePath]
   }
 
@@ -76,26 +83,25 @@ main :: IO ()
 main = do
   args <- cmdArgs argsDesc
   let fns = files args
+  st0 <- initSt args
   case fns of
     [] -> putStrLn summry
     (fn:_) -> do
       let mnFn = new_ext "_main.hs" fn
       let llFn = new_ext ".ll" fn
-      st <- execStateT pec_all $ initSt args
-      when (modified st || rebuild st) $ writeFile mnFn $ H.prettyPrint $
+      st <- execStateT pec_all st0
+      mnFnExists <- doesFileExist mnFn
+      when (modified st || rebuild st || not mnFnExists) $ writeFile mnFn $ H.prettyPrint $
         hMainModule (dropExtension fn) (visited st) (strings st)
-      let mnExe = new_ext ".exe" mnFn
-      my_system $ unwords ["ghc --make -o", mnExe, mnFn] -- fixme:check exit code
-      pwd <- getCurrentDirectory
-      my_system $ pwd ++ "/" ++ mnExe
+      my_system "runghc" ["-i" ++ concat (intersperse ":" $ all_imp_dirs st), mnFn]
       let llFns = ["istrings_" ++ new_ext ".ll" fn] ++ (map (new_ext ".ll" . init) $ visited st)
       let llBc = new_ext ".bc" llFn
-      my_system $ "cat " ++ unwords llFns ++ " | llvm-as > " ++ llBc
+      _ <- system $ "cat " ++ unwords llFns ++ " | llvm-as > " ++ llBc
       let llExe = new_ext ".exe" llFn
-      my_system $ unwords ["llvm-ld -disable-opt -o", llExe, llBc] -- array bug in llvm
-      when (not $ keep_tmps st) $ my_system $ unwords $
-        [ "rm *.hi *.o", "*_.hs" -- fixme: clean up Cnts files
-        , mnExe, mnFn, llBc
+      my_system2 "llvm-ld" ["-disable-opt", "-native", "-o", llExe, llBc] -- array bug in llvm
+      when (not $ keep_tmps st) $ my_system "rm" $
+        [ "-f", "*.hi", "*.o", "*_.hs" -- fixme: clean up Cnts files
+        , mnFn, llBc, new_ext ".exe.bc" fn
         ] ++ llFns
       return ()
 
@@ -115,7 +121,8 @@ pec_all = do
 
 pec_file :: FilePath -> M [FilePath]
 pec_file n = do
-  let fn = init n ++ ".pec"
+  let fn0 = init n ++ ".pec"
+  fn <- my_get_filepath fn0
   let hsFn = new_ext "_.hs" fn
   ss <- lift $ liftM lines $ readFile fn
   let (xs,ys) = partition (\s -> not (null s) && head s == '>') ss
@@ -129,6 +136,23 @@ pec_file n = do
         lift $ writeFile hsFn $ unlines $
           imports_hack (lines $ H.prettyPrint h) (map tail xs)
       return $ imports m
+
+all_imp_dirs :: St -> [String]
+all_imp_dirs st = ["."] ++ imp_dirs st ++ [lib_dir st]
+
+my_get_filepath :: FilePath -> M FilePath
+my_get_filepath fn = do
+  xs <- gets all_imp_dirs
+  lift $ get_filepath fn xs
+
+get_filepath :: FilePath -> [FilePath] -> IO FilePath
+get_filepath fn [] = error $ "unable to find file:" ++ fn
+get_filepath fn0 (x:xs) = do
+  let fn = joinPath $ splitPath x ++ [fn0]
+  r <- doesFileExist fn
+  if r
+    then return fn
+    else get_filepath fn0 xs
 
 isOutOfDate :: FilePath -> FilePath -> M Bool
 isOutOfDate inFn outFn = do
@@ -685,10 +709,19 @@ user = lowercase . userc
 userc :: Print a => a -> String
 userc a = printTree a ++ "_"
 
-my_system :: String -> IO ()
-my_system s = do
-  putStrLn $ "system:" ++ s
-  ec <- system s
+my_system :: String -> [String] -> IO ()
+my_system s ss = do
+  putStrLn $ "system:" ++ unwords (s:ss)
+  ec <- rawSystem s ss
+  case ec of
+    ExitSuccess -> return ()
+    ExitFailure i -> error $ "exiting(" ++ show i ++ ")"
+
+my_system2 :: String -> [String] -> IO ()
+my_system2 s ss = do
+  let cmd = unwords (s:ss)
+  putStrLn $ "system:" ++ cmd
+  ec <- system cmd
   case ec of
     ExitSuccess -> return ()
     ExitFailure i -> error $ "exiting(" ++ show i ++ ")"
