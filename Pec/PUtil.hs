@@ -15,12 +15,11 @@ import Distribution.Text
 import Grm.Layout
 import Grm.Lex
 import Grm.Prims
-import Language.Pec.Abs
-import Language.Pec.Abs as P
 import Language.Pec.Par
 import Paths_pec
 import System.Console.CmdArgs
 import qualified Language.Pds.Abs as D
+import qualified Language.Pec.Abs as P
 
 copyright :: String
 copyright = "(C) Brett Letner 2011-2012"
@@ -47,12 +46,12 @@ counts :: P.Module Point -> [Integer]
 counts (P.Module _ _ _ _ xs) = nub $
   [ genericLength (a :: [P.ConC Point])
   | P.TyTagged _ a <- universeBi xs ] ++
-  [ genericLength (a :: [P.Exp Point]) | ArrayE _ a <- universeBi xs ] ++
-  [ pcount a | TyCount _ a <- universeBi xs ] ++
-  [ pcount a | CountE _ a <- universeBi xs ]
+  [ genericLength (a :: [P.Exp Point]) | P.ArrayE _ a <- universeBi xs ] ++
+  [ pcount a | P.TyCount _ a <- universeBi xs ] ++
+  [ pcount a | P.CountE _ a <- universeBi xs ]
 
-pcount :: Count Point -> Integer
-pcount (Count _ i) = read i
+pcount :: P.Count Point -> Integer
+pcount (P.Count _ i) = read i
 
 qual_to_und :: String -> String
 qual_to_und = map f
