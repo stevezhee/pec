@@ -29,20 +29,20 @@ source-repository head
   location: git://github.com/stevezhee/pec.git
 
 Library
-  Exposed-modules: Pec.Base, Pec.C, Pec.LLVM, Pec.PUtil, Pec.HUtil, Pec.IUtil, Pec.Desugar, Language.Pec.Abs, Language.Pec.Par, Language.Pir.Abs, Language.C.Abs, Language.LLVM.Abs, Language.Pds.Abs, Paths_pec
+  Exposed-modules: Pec.Base, Pec.C, Pec.LLVM, Pec.PUtil, Pec.HUtil, Pec.IUtil, Pec.Desugar, Language.Pec.Abs, Language.Pec.Par, Language.Pir.Abs, Language.C.Abs, Language.LLVM.Abs, Language.Pds.Abs
   Build-depends: base, mtl, grm, Cabal, uniplate, derive, wl-pprint, syb, deepseq, array, containers, shake, cmdargs
 
 Executable pecgen
   Main-is: PecGen.hs
-  Build-depends: pec, base, derive, wl-pprint, filepath, cmdargs, grm, Cabal, syb, deepseq, uniplate, mtl, directory
-  Hs-Source-Dirs: src
+  Build-depends: pec, base, derive, wl-pprint, filepath, cmdargs, grm, Cabal, syb, deepseq, uniplate, mtl, directory, shake
+  Hs-Source-Dirs: src, .
 
 Executable pec
   Main-is: Pec.hs
   Build-depends: pec, base, old-time, process, filepath, directory, cmdargs, grm, Cabal, wl-pprint, syb, deepseq, uniplate, mtl, shake
-  Hs-Source-Dirs: src
+  Hs-Source-Dirs: src, .
 
 Executable pecgencnt
   Main-is: PecGenCnt.hs
-  Build-depends: pec, base, derive, cmdargs, grm, Cabal, wl-pprint, syb, deepseq, uniplate, mtl, filepath
-  Hs-Source-Dirs: src
+  Build-depends: pec, base, derive, cmdargs, grm, Cabal, wl-pprint, syb, deepseq, uniplate, mtl, filepath, shake
+  Hs-Source-Dirs: src, .
