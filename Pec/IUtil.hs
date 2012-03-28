@@ -5,16 +5,14 @@
 
 module Pec.IUtil where
 
-import Data.List
-import Grm.Prims
--- import Text.PrettyPrint.Leijen
--- import qualified Language.Haskell as H
-import Language.Pir.Abs
 import Control.Concurrent
 import Data.Char
 import Data.Generics.Uniplate.Data
-import System.IO.Unsafe
+import Data.List
 import Data.Maybe
+import Grm.Prims
+import Language.Pir.Abs
+import System.IO.Unsafe
 
 gTyDecls :: MVar [(Type,TyDecl)]
 gTyDecls = unsafePerformIO $ newMVar []

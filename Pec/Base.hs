@@ -20,10 +20,8 @@ import Data.Data
 import Data.Generics.Uniplate.Data
 import Data.List
 import Development.Shake.FilePath
-import Distribution.Text
 import Grm.Prims
 import Language.Pir.Abs hiding (Exp(..))
-import Paths_pec
 import Pec.C
 import Pec.IUtil (vtvar, gTyDecls)
 import Pec.PUtil
@@ -45,7 +43,7 @@ argsDesc = Args
   } &= summary summry &= program prog
 
 summry :: String
-summry = prog ++ " v" ++ display version ++ ", " ++ copyright
+summry = prog ++ " v" ++ vers ++ ", " ++ copyright
 
 prog :: String
 prog = "pecgen"

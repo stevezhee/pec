@@ -24,10 +24,17 @@ import qualified Language.Pec.Abs as P
 copyright :: String
 copyright = "(C) Brett Letner 2011-2012"
 
+vers :: String
+vers = display version
+
+getLibDir :: IO FilePath
+getLibDir = liftM takeDirectory $ getDataFileName "lib/Prelude.pec"
+
 parse_pec :: FilePath -> IO (P.Module Point)
 parse_pec fn = do
   ts <- P.grmLexFilePath fn
-  let m@(P.Module _ a _ _ _) = grmParse $ layout $ filter notWSToken ts
+  m@(P.Module _ a _ _ _) <-
+    return $ grmParse $ layout $ filter notWSToken ts
   if ((splitDirectories $ dropExtension $ normalise fn) `has_suffix`
       (unqual $ ppShow a))
      then return m
@@ -76,7 +83,7 @@ splitBy p = loop [] []
       | otherwise = loop (c:xs) ys cs
         
 summarize :: String -> String
-summarize prog = prog ++ " v" ++ display version ++ ", " ++ copyright
+summarize prog = prog ++ " v" ++ vers ++ ", " ++ copyright
 
 readFileDeps :: FilePath -> IO ([String],[Integer])
 readFileDeps = liftM read . readFile

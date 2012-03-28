@@ -10,9 +10,7 @@ import Control.Monad
 import Data.List
 import Development.Shake hiding (getDirectoryContents)
 import Development.Shake.FilePath
-import Distribution.Text
 import Grm.Prims
-import Paths_pec
 import Pec.PUtil
 import System.Console.CmdArgs
 import System.Directory hiding (readable)
@@ -37,7 +35,7 @@ argsDesc = Args
   } &= summary summry &= program prog
 
 summry :: String
-summry = prog ++ " v" ++ display version ++ ", " ++ copyright
+summry = prog ++ " v" ++ vers ++ ", " ++ copyright
 
 prog :: String
 prog = "pec"
@@ -63,7 +61,7 @@ rmrf fn = do
 main :: IO ()
 main = do
   a <- cmdArgs argsDesc
-  libDir <- liftM takeDirectory $ getDataFileName "lib/Prelude.pec"
+  libDir <- getLibDir
   let idirs = ["."] ++ idir a ++ [libDir]
 
   when ("clean" `elem` targets a) $ do
