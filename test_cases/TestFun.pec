@@ -1,0 +1,45 @@
+module TestFun
+
+imports
+  Prelude
+
+where
+
+main :: () -> I32
+main () = do
+  putLn "testFun"
+  assert (oneArg 4 'c')
+  f = is_lower
+  assert (f 'c')
+  g = alsoOne 3
+  assert (g 4 'c')
+  h = new is_lower
+  assert (@h 'c')
+  assert (argFunPtr h)
+  h <- is_upper
+  assert (not (@h 'c'))
+  assert (not (argFunPtr h))
+  assert (argFun is_lower)
+  assert (not (argFun is_upper))
+  assert ((retFun True) 'c')
+  assert (not ((retFun False) 'c'))
+  putLn "done"
+  0
+
+twoArgs :: W32 -> Char -> Bool
+twoArgs a b = True
+
+oneArg :: W32 -> (Char -> Bool)
+oneArg a = is_lower
+
+alsoOne :: I32 -> (W32 -> Char -> Bool)
+alsoOne a = twoArgs
+
+argFun :: (Char -> Bool) -> Bool
+argFun f = f 'c'
+
+argFunPtr :: Ptr (Char -> Bool) -> Bool
+argFunPtr p = @p 'c'
+
+retFun :: Bool -> (Char -> Bool)
+retFun a = if a is_lower is_upper

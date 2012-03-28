@@ -1,0 +1,24 @@
+module Euler2
+
+imports
+  Prelude
+
+where
+
+main :: () -> I32
+main () = do
+  i = new (1 :: W32)
+  t = new 0
+  tot = new 0
+  for 2 (\j -> j <= 4000000) (\j -> j + @t)
+    (\j -> do
+      when (is_even j) (tot += j)
+      t <- @i
+      i <- j
+    )
+  assert (@tot == 4613732)
+  putW @tot
+  0
+
+is_even :: W32 -> Bool
+is_even x => (x % 2) == 0

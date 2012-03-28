@@ -1,0 +1,91 @@
+module TestDeque
+
+imports
+  Prelude
+  Data.Deque
+
+where
+
+main :: () -> I32
+main () = do
+  putLn "test Deque"
+  test push_front pop_front
+  test push_back pop_back
+  test push_front pop_back
+  test push_back pop_front
+  putLn "done"
+  0
+
+test push pop => do
+  p = new (deque #3) // deques must be given a size
+  mc = new (pop p)
+  case mc of
+    Nothing -> assert True
+    Just _ -> assert False
+  assert (push 'a' p)
+  case new (pop p) of
+    Nothing -> assert False
+    Just c -> do
+      putCh @c
+      assert (@c == 'a')
+  assert (is_empty p)
+  put putCh p
+  assert (push 'a' p)
+  put putCh p
+  assert (push 'b' p)
+  put putCh p
+  assert (push 'c' p)
+  put putCh p
+  assert (is_full p)
+  assert (not (push 'd' p))
+  mc <- pop p
+  case mc of
+    Nothing -> assert False
+    Just c -> do
+      putCh @c
+  mc <- pop p
+  put putCh p
+  mc <- pop p
+  put putCh p
+  assert (is_empty p)
+  assert (push 'x' p)
+  assert (push 'y' p)
+  mc <- pop p
+  put putCh p
+
+  assert (push 'z' p)
+  put putCh p
+
+  assert (push '1' p)
+  put putCh p
+
+  case mc of
+    Nothing -> assert False
+    Just c -> putCh @c
+
+  mc <- pop p
+  case mc of
+    Nothing -> assert False
+    Just c -> putCh @c
+
+  put putCh p
+
+  case new (find_idx (eq 'x') p) of
+    Nothing -> putS "no x"
+    Just ix -> do
+      putS "x at index:"
+      putW (from_idx @ix)
+
+  if (any (eq 'x') p) (putS "has x") (putS "no x")
+
+  assert (push 'x' p)
+  put putCh p
+
+  filter (eq 'x') p
+  put putCh p
+
+  assert (push 'x' p)
+  filter (eq 'x') p
+  put putCh p
+
+  putLn ""

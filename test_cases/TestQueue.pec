@@ -1,0 +1,60 @@
+module TestQueue
+
+// polymorphic queue implementation
+
+imports
+  Prelude
+  Data.Queue
+
+where
+
+main :: () -> I32
+main () = do
+  putLn "test Queue"
+  p = new (queue #3) // queues must be given a size
+  mc = new (pop p)
+  case mc of
+    Nothing -> assert True
+    Just _ -> assert False
+  assert (push 'a' p)
+  case new (pop p) of
+    Nothing -> assert False
+    Just c -> do
+      putCh @c
+      assert (@c == 'a')
+  assert (is_empty p)
+  put putCh p
+  assert (push 'a' p)
+  put putCh p
+  assert (push 'b' p)
+  put putCh p
+  assert (push 'c' p)
+  put putCh p
+  assert (is_full p)
+  assert (not (push 'd' p))
+  mc <- pop p
+  put putCh p
+  case mc of
+    Nothing -> assert False
+    Just c -> do
+      putCh @c
+      assert (@c == 'a')
+  mc <- pop p
+  put putCh p
+  mc <- pop p
+  put putCh p
+  assert (is_empty p)
+  assert (push 'x' p)
+  assert (push 'y' p)
+  mc <- pop p
+  case mc of
+    Nothing -> assert False
+    Just c -> assert (@c == 'x')
+
+  mc <- pop p
+  case mc of
+    Nothing -> assert False
+    Just c -> assert (@c == 'y')
+
+  putLn "done"
+  0

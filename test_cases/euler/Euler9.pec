@@ -1,0 +1,39 @@
+module Euler9
+
+imports
+  Prelude
+
+where
+
+main :: () -> I32
+main () = do
+  pc = new (1 :: W32)
+  pa = new 1
+  g = new True
+  while ((@pc < 1000) && @g)
+    (do
+      pa <- 1
+      while ((@pa < @pc) && @g)
+        (do
+          g <- foo @pa @pc
+          inc pa
+        )
+      inc pc
+    )
+  a = @pa - 1
+  c = @pc - 1
+  b = ((1000 - a) - c)
+  // putW a
+  // putS " "
+  // putW b
+  // putS " "
+  // putW c
+  assert ((a < b) && (b < c))
+  assert (((a*a) + (b*b)) == (c*c))
+  assert (((a + b) + c) == 1000)
+  v = (a*b)*c
+  putW v
+  assert (v == 31875000)
+  0
+
+foo a c => ((500000 + ((a*a) + (a * c))) - ((a * 1000) + (c * 1000))) != 0

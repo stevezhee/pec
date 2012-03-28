@@ -1,39 +1,127 @@
-module TestStack exports all
+module TestStack
+
+// polymorphic stack implementation
+
+imports
+  Prelude
+  Data.Stack
 
 where
 
-// polymorphic Stack implementation
-
-import Prelude
-import Stack
-
-main :: () -> W32
+main :: () -> I32
 main () = do
   putLn "test Stack"
   p = new (stack #3) // stacks must be given a size
-  case new (pop p) of
+  put putCh p
+  mc = new (pop p)
+  case mc of
     Nothing -> assert True
     Just _ -> assert False
   assert (push 'a' p)
+  put putCh p
   case new (pop p) of
     Nothing -> assert False
     Just c -> do
       putCh @c
       assert (@c == 'a')
+  put putCh p
   assert (is_empty p)
   assert (push 'a' p)
+  put putCh p
   assert (push 'b' p)
+  put putCh p
   assert (push 'c' p)
+  put putCh p
   assert (is_full p)
   assert (not (push 'd' p))
-  mc = new (pop p)
+  mc <- pop p
+  put putCh p
   case mc of
     Nothing -> assert False
     Just c -> do
       putCh @c
       assert (@c == 'c')
   mc <- pop p
+  put putCh p
   mc <- pop p
+  put putCh p
   assert (is_empty p)
+  assert (push 'x' p)
+  assert (push 'y' p)
+  put putCh p
+  mc <- pop p
+  case mc of
+    Nothing -> assert False
+    Just c -> assert (@c == 'y')
+
+  mc <- pop p
+  case mc of
+    Nothing -> assert False
+    Just c -> assert (@c == 'x')
+
+  put putCh p
+  w = new (stack #6 :: Stack #6 W32)
+  assert (push 0 w)
+  assert (push 1 w)
+  assert (push 2 w)
+
+  t = new 0
+  t <- sum w
+  assert (@t == 3)
+
+  foreach inc w
+
+  t <- sum w
+  assert (@t == 6)
+
+  assert (push 1 w)
+  assert (push 2 w)
+  assert (push 1 w)
+
+  t <- sum w
+  assert (@t == 10)
+
+  mpw = new (find (eq 1) w)
+  case mpw of
+    Nothing -> assert False
+    Just pw -> @pw <- 2
+
+  put putW w
+
+  t <- sum w
+  assert (@t == 11)
+
+  filter (eq 2) w
+  t <- sum w
+  assert (@t == 6)
+  put putW w
+
   putLn "done"
   0
+
+test_ops :: () -> ()
+test_ops () = do
+  putLn "test_ops"
+  stck = new (stack #3 :: Stack #3 W32)
+  assert (push 1 stck)
+  assert (push 2 stck)
+  assert (push 3 stck)
+
+  t = new (sum stck)
+  assert (@t == 6)
+
+  foreach inc stck
+  t <- sum stck
+  assert (@t == 9)
+
+  mi = new (find_idx (eq 0) stck)
+  case mi of
+    Nothing -> assert True
+    Just _ -> assert False
+
+  mi <- find_idx (eq 4) stck
+  case mi of
+    Nothing -> assert False
+    Just i -> assert (@i == 2)
+
+sum => fold add 0

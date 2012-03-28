@@ -1,54 +1,239 @@
 module Prelude
 
-exports all
-
 where
 
-type W8 = W #256 //singleton "Count" type.  In this case, used to specify a word that holds 256 values.
-type W16 = W #65536
-type I32 = I #4294967296 // 32 bit int
+type W8 = W #8 //An unsigned 8-bit word.
+type W16 = W #16
+type W32 = W #32
+type W64 = W #64
+type I8 = I #8 // a signed 8-bit int
+type I16 = I #16
+type I32 = I #32
+type I64 = I #64
 
 type Bool = | False | True
 // enum type
 // the "|" is used to specify "or"
 
+instance Eq Bool // eq and ne can be derived for enums
+
 type Maybe a = | Nothing | Just a // polymorphic variant
 // order doesn't matter
 // type Maybe a = | Just a | Nothing would be compiled exactly the same way
+
+is_nothing :: { Load p } => Pointer p (Maybe a) -> Bool
+is_nothing x => case x of
+  Nothing -> True
+  _ -> False
 
 type Either a b = | Left a | Right b // polymorphic variant
 
 type Ordering = | LT | EQ | GT // another enum
 
-extern putchar :: Char -> ()
-// external C call
-// name on the left, type on the right
+instance Eq Ordering
 
-extern puts :: Ptr Char -> ()
-extern exit :: I32 -> ()
+// externally defined names.  name on the left, type on the right
+
+// external C calls
+new :: a -> Ptr a
+new a => do
+  p = unsafe_alloca
+  p <- a
+  p
+
+extern unsafe_alloca :: Ptr a
+
+unsafe_alloca_array :: #cnt -> Ptr (Array #cnt a)
+unsafe_alloca_array _ => unsafe_alloca
+
+extern store :: { Store p } => Pointer p a -> a -> ()
+extern load :: { Load p } => Pointer p a -> a
+extern idx :: Pointer p (Array #cnt a) -> Idx #cnt -> Pointer p a
+extern then :: () -> a -> a
+
+extern exit :: I32 -> a
+
+// language primitives
+extern add :: { Arith a } => a -> a -> a
+extern sub :: { Arith a } => a -> a -> a
+extern mul :: { Arith a } => a -> a -> a
+extern div :: { Arith a } => a -> a -> a
+extern rem :: { Arith a } => a -> a -> a
+extern gt :: { Ord a } => a -> a -> Bool
+extern gte :: { Ord a } => a -> a -> Bool
+extern lt :: { Ord a } => a -> a -> Bool
+extern lte :: { Ord a } => a -> a -> Bool
+extern eq :: { Eq a } => a -> a -> Bool
+extern ne :: { Eq a } => a -> a -> Bool
+extern shl :: W #a -> W #a -> W #a
+extern shr :: W #a -> W #a -> W #a
+extern band :: W #a -> W #a -> W #a
+extern bor :: W #a -> W #a -> W #a
+extern bxor :: W #a -> W #a -> W #a
+extern bnot :: W #a -> W #a -> W #a
+// BAL: support ashr?
+
+extern if :: Bool -> a -> a -> a
+extern when :: Bool -> () -> ()
+extern while :: Bool -> () -> ()
+
+eq_eq => eq
+bang_eq => ne
+gt_eq => gte
+lt_eq => lte
+add_eq p x => p <- @p + x
+sub_eq p x => p <- @p - x
+mul_eq p x => p <- @p * x
+div_eq p x => p <- @p / x
+
+and :: Bool -> Bool -> Bool
+and a b => if a b False
+band_band => and
+
+or :: Bool -> Bool -> Bool
+or a b => if a True b
+bor_bor => or
+
+lt_lt => shl
+gt_gt => shr
+
+extern abs :: { Arith a } => a -> a
+extern acos :: { Floating a } => a -> a
+extern asin :: { Floating a } => a -> a
+extern atan :: { Floating a } => a -> a
+extern atan2 :: { Floating a } => a -> a
+extern ceil :: { Floating a } => a -> a
+extern cos :: { Floating a } => a -> a
+extern cosh :: { Floating a } => a -> a
+extern exp :: { Floating a } => a -> a
+extern floor :: { Floating a } => a -> a
+extern log :: { Floating a } => a -> a
+extern log10 :: { Floating a } => a -> a
+extern pow :: { Floating a } => a -> a -> a
+extern sin :: { Floating a } => a -> a
+extern sinh :: { Floating a } => a -> a
+extern sqrt :: { Floating a } => a -> a
+extern tan :: { Floating a } => a -> a
+extern tanh :: { Floating a } => a -> a
+
+sqrtw :: W #cnt -> W #cnt
+sqrtw x => unsafe_cast (floor (sqrt ((unsafe_cast x) :: Double)))
+
+extern "printf" unsafe_printf :: { Load p } => Pointer p Char -> a -> ()
+
+putW :: W #cnt -> ()
+putW => unsafe_putS "%u"
+
+putI :: I #cnt -> ()
+putI => unsafe_putS "%i"
+
+putF :: Float -> ()
+putF => unsafe_putS "%f"
+
+putD :: Double -> ()
+putD => unsafe_putS "%f"
+
+inc :: { Arith a } => Ptr a -> ()
+inc x => x <- @x + 1
+
+dec :: { Arith a } => Ptr a -> ()
+dec x => x <- @x - 1
+
+for :: a -> (a -> Bool) -> (a -> a) -> (a -> ()) -> ()
+for a f g h => do
+  p = new a
+  while (f @p)
+    (do
+      h @p
+      p <- g @p
+    )
+
+times :: { Arith a, Ord a } => a -> (a -> ()) -> ()
+times n f => for 0 (\i -> i < n) succ f
+
+succ :: { Arith a } => a -> a
+succ a => a + 1
+
+flip :: (a -> b -> c) -> b -> a -> c
+flip f b a => f a b
+
+chr :: W8 -> Char
+chr => unsafe_cast
+
+ord :: Char -> W8
+ord => unsafe_cast
+
+from_idx :: Idx #cnt -> W32
+from_idx => unsafe_cast
+
+unsafe_to_idx :: W32 -> Idx #cnt
+unsafe_to_idx => unsafe_cast
 
 to_ordering :: I32 -> Ordering
-to_ordering x = branch of
-  | x < 0 -> LT
-  | x > 0 -> GT
-  | -> EQ
+to_ordering x = branch
+  x < 0 -> LT
+  x > 0 -> GT
+  | EQ
 
 putCh :: Char -> ()
-putCh c = putchar c
+putCh => unsafe_putS "%c"
+
+putElem :: { Load p } => (a -> ()) -> Pointer p a -> ()
+putElem f p => do
+  f @p
+  putCh ' '
+
+putBrackets :: () -> ()
+putBrackets f => do
+  putCh '['
+  putCh ' '
+  f
+  putCh ']'
 
 assert :: Bool -> ()
-assert x = when (not x)
-  (do
-    putLn "assertion failed"
-    exit -1
-  )
-// "when" is not a primitive, it is a library function, see "when_" below
+assert x = when (not x) (error "assertion failed")
 
 not :: Bool -> Bool
-not x = if x False True
+not x => if x False True
+
+error :: IString -> a
+error x => do
+  putLn x
+  exit -1
+  unsafe_alpha
+
+undefined :: a
+undefined => error "undefined"
+
+extern unsafe_alpha :: a
+
+putS :: IString -> ()
+putS x => unsafe_putS "%s" x
+
+unsafe_putS :: IString -> a -> ()
+unsafe_putS x => unsafe_printf (iString_unwrapptr x)
 
 putLn :: IString -> ()
-putLn x = puts (from_istring x)
+putLn x => do
+  putS x
+  putS "\n"
+
+// different pointer types
+type Ptr a = Pointer LoadStoreP a
+type RPtr a = Pointer LoadP a
+type WPtr a = Pointer StoreP a
+
+type LoadP
+type StoreP
+type LoadStoreP
+
+instance Load LoadP
+instance Store StoreP
+instance Load LoadStoreP
+instance Store LoadStoreP
+
+iString_unwrapptr :: IString -> RPtr Char
+iString_unwrapptr => unsafe_cast
 
 is_upper :: Char -> Bool
 is_upper c = (c >= 'A') && (c <= 'Z') // operators don't have precedence, parens are required
@@ -60,228 +245,54 @@ is_digit :: Char -> Bool
 is_digit c = (c >= '0') && (c <= '9')
 
 to_lower :: Char -> Char
-to_lower c = branch of
-  | is_upper c -> chr (ord c + 32)
-  | -> c
+to_lower c = branch
+  is_upper c -> chr (ord c + 32)
+  | c
 
 to_upper :: Char -> Char
-to_upper c = branch of
-  | is_lower c -> chr (ord c - 32)
-  | -> c
+to_upper c = branch
+  is_lower c -> chr (ord c - 32)
+  | c
 
-// inline Haskell "library" DSL code
+otherwise :: Bool
+otherwise => True
 
->import Pec.Base
->import Data.List
->
->type CntW8 = Cnt256
->type W8 = W CntW8
->type Char_ = Char
->type Ptr_ a = Ptr a
->type IString_ = IString
->type W32_ = W32
->type Float_ = Float
->type Double_ = Double
->
->class Typed a => ARITH a where
->  add :: Term a -> Term a -> Term a
->  sub :: Term a -> Term a -> Term a
->  mul :: Term a -> Term a -> Term a
->  adiv :: Term a -> Term a -> Term a
->  arem :: Term a -> Term a -> Term a
->
->class Typed a => BITS a where
->  shl :: Term a -> Term a -> Term a
->  shr :: Typed a => Term a -> Term a -> Term a
->  band :: Term a -> Term a -> Term a
->  bor :: Term a -> Term a -> Term a
->  xor :: Term a -> Term a -> Term a
->  -- support ashr?
->
->class Typed a => ORD a where
->  gt :: Term a -> Term a -> Term Bool_
->  ge :: Term a -> Term a -> Term Bool_
->  lt :: Term a -> Term a -> Term Bool_
->  le :: Term a -> Term a -> Term Bool_
->
->class Typed a => EQ a where
->  eq :: Term a -> Term a -> Term Bool_
->  eq = prim2 "icmp eq"
->  ne :: Term a -> Term a -> Term Bool_
->  ne = prim2 "icmp ne"
->
->class (Typed a, Show a) => FRAC a where
->  frac :: a -> Term a
->  frac = val . show
->
-// operators must be defined using the DSL
-// The '$' is tacked on by the compiler in order to avoid name clashes.
->(@$) :: Typed a => Term (Ptr a) -> Term a
->(@$) = load
->
->(>$) :: ORD a => Term a -> Term a -> Term Bool_
->(>$) = gt
->
->(>=$) :: ORD a => Term a -> Term a -> Term Bool_
->(>=$) = ge
->
->(<$) :: ORD a => Term a -> Term a -> Term Bool_
->(<$) = lt
->
->(<=$) :: ORD a => Term a -> Term a -> Term Bool_
->(<=$) = le
->
->(+$) :: ARITH a => Term a -> Term a -> Term a
->(+$) = add
->
->(-$) :: ARITH a => Term a -> Term a -> Term a
->(-$) = sub
->
->(*$) :: ARITH a => Term a -> Term a -> Term a
->(*$) = mul
->
->(/$) :: ARITH a => Term a -> Term a -> Term a
->(/$) = adiv
->
->(%$) :: ARITH a => Term a -> Term a -> Term a
->(%$) = arem
->
->(==$) :: EQ a => Term a -> Term a -> Term Bool_
->(==$) = eq
->
->(!=$) :: EQ a => Term a -> Term a -> Term Bool_
->(!=$) = ne
->
->(<<$) :: BITS a => Term a -> Term a -> Term a
->(<<$) = shl
->
->(>>$) :: BITS a => Term a -> Term a -> Term a
->(>>$) = shr
->
->(&$) :: BITS a => Term a -> Term a -> Term a
->(&$) = band
->
->(|$) :: BITS a => Term a -> Term a -> Term a
->(|$) = bor
->
->(^$) :: BITS a => Term a -> Term a -> Term a
->(^$) = xor
->
->(&&$) :: Term Bool_ -> Term Bool_ -> Term Bool_
->(&&$) x y = Lift $ do
->  a <- eval x
->  b <- eval y
->  return $ switch a
->    [(false_tag, false_alt (\ _ -> false_))
->    ,(defaulttag, \ _ -> b)]
->
->(||$) :: Term Bool_ -> Term Bool_ -> Term Bool_
->(||$) x y = Lift $ do
->  a <- eval x
->  b <- eval y
->  return $ switch a
->    [(true_tag, true_alt (\ _ -> true_))
->    ,(defaulttag, \ _ -> b)]
->
-// ad-hoc polymorphism, using Haskell classes
->instance Count cnt => EQ (I cnt)
->instance Count cnt => EQ (W cnt)
->instance EQ Char
->instance EQ IString
->instance (EQ a, EQ b) => EQ (a,b)
->instance INT Double where int = frac . fromInteger
->instance INT Float where int = frac . fromInteger
->instance FRAC Double
->instance FRAC Float
->
->instance Count cnt => BITS (W cnt) where
->  shl = prim2 "shl"
->  shr = prim2 "lshr"
->  band = prim2 "and"
->  bor = prim2 "or"
->  xor = prim2 "xor"
->
->instance Count cnt => ORD (W cnt) where
->  gt = prim2 "icmp ugt"
->  ge = prim2 "icmp uge"
->  lt = prim2 "icmp ult"
->  le = prim2 "icmp ule"
->
->instance ORD Char where
->  gt = prim2 "icmp ugt"
->  ge = prim2 "icmp uge"
->  lt = prim2 "icmp ult"
->  le = prim2 "icmp ule"
->
->instance Count cnt => ORD (I cnt) where
->  gt = prim2 "icmp sgt"
->  ge = prim2 "icmp sge"
->  lt = prim2 "icmp slt"
->  le = prim2 "icmp sle"
->
->instance ORD Double where
->  gt = prim2 "fcmp ogt"
->  ge = prim2 "fcmp oge"
->  lt = prim2 "fcmp olt"
->  le = prim2 "fcmp ole"
->
->instance ORD Float where
->  gt = prim2 "fcmp ogt"
->  ge = prim2 "fcmp oge"
->  lt = prim2 "fcmp olt"
->  le = prim2 "fcmp ole"
->
->instance Count cnt => ARITH (I cnt) where
->  add = prim2 "add"
->  sub = prim2 "sub"
->  mul = prim2 "mul"
->  adiv = prim2 "sdiv"
->  arem = prim2 "srem"
->
->instance Count cnt => ARITH (W cnt) where
->  add = prim2 "add"
->  sub = prim2 "sub"
->  mul = prim2 "mul"
->  adiv = prim2 "udiv"
->  arem = prim2 "urem"
->
->instance ARITH Double where
->  add = prim2 "fadd"
->  sub = prim2 "fsub"
->  mul = prim2 "fmul"
->  adiv = prim2 "fdiv"
->  arem = prim2 "frem"
->
->instance ARITH Float where
->  add = prim2 "fadd"
->  sub = prim2 "fsub"
->  mul = prim2 "fmul"
->  adiv = prim2 "fdiv"
->  arem = prim2 "frem"
->
->eq_unit = \_ _ -> true_
->ne_unit = \_ _ -> false_
->
->instance EQ () where
->  eq = eq_unit
->  ne = ne_unit
->
-// polymorphic function
-// note that the '_' is added to the end of pec names to avoid name clashes
->array_ :: (Count cnt, Typed cnt, Typed a) => Term (cnt -> a -> Array cnt a)
->array_ = lam2_ $ \(cnt :: Term cnt) x -> Lift $ do
->  a <- eval x
->  return $ array cnt $ genericReplicate (countof (unused :: cnt)) a
->
->ord_ :: Term (Char -> W8)
->ord_ = lam_ cast
->
->chr_ :: Term (W8 -> Char)
->chr_ = lam_ cast
->
->if_ :: Typed a => Term (Bool_ -> a -> a -> a)
->if_ = lam3_ $ \f g h ->
->  switch f [(true_tag, \_ -> g), (false_tag, \_ -> h)]
->
->when_ :: Term (Bool_ -> () -> ())
->when_ = lam2_ $ \a b -> app3 if_ a b unit
+min :: { Ord a } => a -> a -> a
+min a b => do
+  x = a
+  y = b
+  if (x < y) x y
+
+max :: { Ord a } => a -> a -> a
+max a b => do
+  x = a
+  y = b
+  if (x > y) x y
+
+max_idx :: Idx #cnt -> Idx #cnt
+max_idx _ => idx_max
+
+count_idx :: Idx #cnt -> W32
+count_idx x => from_idx (max_idx x) + 1
+
+id :: a -> a
+id x => x
+
+type Pair a b = { fst :: a, snd :: b }
+
+pair :: a -> b -> (a,b)
+pair a b => (a,b) // same as { fst = a, snd = b }
+
+fst :: Pointer p (a,b) -> Pointer p a
+fst (a,_) => a
+
+snd :: Pointer p (a,b) -> Pointer p b
+snd (_,b) => b
+
+ignore :: a -> b -> b
+ignore _ b => b
+
+extern void :: ()
+
+fold_ptr :: { Load p } => (b -> a -> b) -> Ptr b -> Pointer p a -> ()
+fold_ptr f pb pa => pb <- f @pb @pa

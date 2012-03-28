@@ -1,0 +1,45 @@
+module Data.StrBuf
+
+imports
+  Prelude
+  Data.Array as A
+
+where
+
+type StrBuf cnt = | StrBuf (Array #cnt Char)
+
+extern "strcmp" c_strcmp :: { Load p, Load q } =>
+  Pointer p Char -> Pointer q Char -> I32
+extern "strlen" c_strlen :: { Load p } => Pointer p Char -> W32
+extern "strncpy" c_strncpy :: { Store p, Load q } =>
+  Pointer p Char -> Pointer q Char -> W32 -> ()
+
+from_strbuf :: Pointer p (StrBuf #cnt) -> Pointer p Char
+from_strbuf => unsafe_cast
+
+strcmp :: { Load p, Load q } => Pointer p (StrBuf #a) -> Pointer q (StrBuf #b) -> Ordering
+strcmp a b => to_ordering (c_strcmp (from_strbuf a) (from_strbuf b))
+
+strlen :: { Load p } => Pointer p (StrBuf #cnt) -> W32
+strlen a => c_strlen (from_strbuf a)
+
+to_strbuf :: IString -> Ptr (StrBuf #cnt) -> Bool
+to_strbuf a => cstrcpy (iString_unwrapptr a)
+
+strcpy :: { Load p } => Pointer p (StrBuf #a) -> Ptr (StrBuf #b) -> Bool
+strcpy a => cstrcpy (from_strbuf a)
+
+cstrcpy :: { Load p } => Pointer p Char -> Ptr (StrBuf #cnt) -> Bool
+cstrcpy a b => do
+  p => strBuf_unwrapptr b
+  c_strncpy (from_strbuf b) a (count p)
+  q => p[idx_max]
+  r = @q == '\0'
+  q <- '\0'
+  r
+
+strbuf :: #cnt -> StrBuf #cnt
+strbuf cnt => StrBuf (A.array cnt '\0')
+
+put :: { Load p } => Pointer p (StrBuf #cnt) -> ()
+put x => putS (unsafe_cast (from_strbuf x))

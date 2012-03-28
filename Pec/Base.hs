@@ -1,599 +1,708 @@
 {-# OPTIONS -Wall #-}
-{-# LANGUAGE EmptyDataDecls, MultiParamTypeClasses #-}
-{-# LANGUAGE FunctionalDependencies, FlexibleInstances #-}
-{-# LANGUAGE ScopedTypeVariables, TypeSynonymInstances, GADTs #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE EmptyDataDecls #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 
 -- The pec embedded compiler
--- Copyright 2011, Brett Letner
+-- Copyright 2011-2012, Brett Letner
 
 module Pec.Base
+( module Pec.Base
+, module Language.Pir.Abs
+, unused
+)
 
 where
 
-import Control.Monad
-import Control.Monad.State hiding (lift)
-import Data.Char
+import Control.Concurrent
+import Control.Monad.State
+import Data.Data
+import Data.Generics.Uniplate.Data
 import Data.List
-import Data.Unique
-import Numeric
-import System.IO
-import qualified Control.Monad.State as S
+import Development.Shake.FilePath
+import Distribution.Text
+import Grm.Prims
+import Language.Pir.Abs hiding (Exp(..))
+import Paths_pec
+import Pec.C
+import Pec.IUtil (vtvar, gTyDecls)
+import Pec.PUtil
+import Prelude hiding (exp)
+import System.Console.CmdArgs hiding (atom)
+import System.IO.Unsafe
+import qualified Language.Pir.Abs as I
+import qualified Pec.LLVM as L
 
-data V a = V String
-data Decl a = Decl Id (Term a)
-data Ptr a
-data Tag a cnt
-data Idx cnt
-data Array cnt a
-data I cnt
-data IString
-data W cnt
-data Cnt256 = Cnt256
-data Cnt4294967296 = Cnt4294967296
-data SuccCnt cnt
+data Args = Args
+  { march :: Arch
+  , readable :: Bool
+  } deriving (Show, Data, Typeable)
 
-data Term a where
-  Arg :: (Typed a, Typed b) => Id -> (Term a -> Term b) -> Term (a -> b)
-  Val :: Typed a => V a -> Term a
-  App :: (Typed a, Typed b) => Term (a -> b) -> Term a -> Term b
-  Lift :: Typed a => M (Term a) -> Term a
+argsDesc :: Args
+argsDesc = Args
+  { march = def &= help "arch to build (C or LLVM)"
+  , readable = def &= help "generate human readable C (experimental)"
+  } &= summary summry &= program prog
 
-data Ty
-  = TyUnit
-  | TyEnum Integer
-  | TyPtr Ty
-  | TyArray Integer Ty
-  | TyPair Ty Ty
-  | TySum [Ty]
-  | TyFun Ty Ty
-  | TyDouble
-  | TyFloat
-  deriving Eq
+summry :: String
+summry = prog ++ " v" ++ display version ++ ", " ++ copyright
 
+prog :: String
+prog = "pecgen"
+
+data E a = E Exp deriving Show
+
+unE :: Typed a => E a -> Exp
+unE = f (error "unused:unE")
+  where
+    f :: Typed a => a -> E a -> Exp
+    f a (E x) = seq (addGTyDecls $ tydecls a) x
+    
+setE :: Typed a => Exp -> E a
+setE = f (error "unused:setE")
+  where
+    f :: Typed a => a -> Exp -> E a
+    f a x = seq (addGTyDecls $ tydecls a) $ E x
+
+data Exp
+  = VarE TVar
+  | AppE Exp Exp
+  | SwitchE Exp Exp [(Exp,Exp)]
+  | LitE TLit
+  | LetE TVar Exp Exp
+  | LamE TVar (Exp -> Exp)
+  | DefE TVar Exp
+        
+instance Show Exp where -- for debugging
+  show x = case x of
+    VarE a -> unwords ["VarE", show a]
+    AppE a b -> unwords ["AppE", show a, show b]
+    SwitchE a b c -> unwords ["SwitchE", show a, show b, show c]
+    LitE a -> unwords ["LitE", show a]
+    LetE a b c -> unwords ["LetE", show a, show b, show c]
+    LamE a _ -> unwords ["LamE", show a]
+    DefE a b -> unwords ["DefE", show a, show b]
+           
+apps :: [Exp] -> Exp
+apps = foldl1 AppE
+
+type M a = State St a
+  
 data St = St
-  { istrings_tbl :: [String]
-  , outH :: Handle
-  , last_label :: Label
+  { stmts :: [Stmt]
   }
 
-type CntW32 = Cnt4294967296
-type W32 = W CntW32
-type Label = String
-type M a = StateT St IO a
-type Id = String
-type CString = Ptr Char
-type W_ a = W a
-type I_ a = I a
-type SuccCnt_ a = SuccCnt a
+tatom :: Atom -> Type
+tatom x = case x of
+  VarA (TVar _ a) -> a
+  LitA (TLit _ a) -> a
 
-class Count cnt where countof :: cnt -> Integer
+isVoidA :: Atom -> Bool
+isVoidA = isVoidTy . tatom
 
-instance Count cnt => Count (SuccCnt cnt) where
-  countof _ = succ $ countof (unused :: cnt)
+isVoidE :: I.Exp -> Bool
+isVoidE = isVoidTy . texp
 
-class (Count cnt, Typed a) => Tagged a cnt | a -> cnt where
-  tagof :: Term a -> Term (Tag a cnt)
+isVoidV :: TVar -> Bool
+isVoidV = isVoidTy . ttvar
 
-class Typed a where
-  typeof :: a -> Ty
-  callt :: Id -> [(Id,Ty)] -> Term a
-  callt n bs = with_local $ \(v :: V a) -> do
-    let t = typeof (unused :: a)
-    let pre = if is_tyunit t then [] else [vof v ++ " ="]
-    out 2 $ pre ++ ["call", tyof t, n ++ args (reverse bs)]
+fNoOpS :: [Stmt] -> Maybe [Stmt]
+fNoOpS xs | any ((==) NoOpS) xs = Just $ filter ((/=) NoOpS) xs
+fNoOpS _ = Nothing
 
-class (Typed a, Typed b) => Newtype a b | a -> b where
-  unwrap_ :: Term (a -> b)
-  unwrap_ = wrap
+fVoidS :: Stmt -> Maybe Stmt
+fVoidS (ReturnS (LitA (TLit VoidL _))) = Nothing
+fVoidS (ReturnS a) | isVoidA a = Just $ ReturnS voidA
+fVoidS (LetS _ b) | isVoidE b = case b of
+  I.CallE a bs -> Just $ CallS a bs
+  _ -> Just NoOpS
+fVoidS (CallS a bs) | any isVoidA bs =
+  Just $ CallS a $ filter (not . isVoidA) bs
+  -- ^ type of a is no longer correct (it may contain void types)
+fVoidS (StoreS _ b) | isVoidA b = Just NoOpS
+fVoidS _ = Nothing
 
-  unwrap_ptr_ :: Term (Ptr a -> Ptr b)
-  unwrap_ptr_ = lam_ cast
+fVoidE :: I.Exp -> Maybe I.Exp
+fVoidE (I.CallE a bs) | any isVoidA bs =
+  Just $ I.CallE a $ filter (not . isVoidA) bs
+  -- ^ type of a is no longer correct (it may contain void types)
+fVoidE _ = Nothing
 
-class INT a where int :: Integer -> Term a
+fVoidD :: Define -> Maybe Define
+fVoidD (Define a b cs ds) | any isVoidV cs =
+  Just $ Define a b (filter (not . isVoidV) cs) ds
+fVoidD _ = Nothing
 
-instance Count Cnt256 where countof _ = 256
-instance Count Cnt4294967296 where countof _ = 4294967296
-instance Count cnt => INT (I cnt) where int = sint unused
-instance Count cnt => INT (Idx cnt) where int = uint unused
-instance Count cnt => INT (W cnt) where int = uint unused
-instance Count cnt => Tagged (I cnt) cnt where tagof = cast
-instance Count cnt => Tagged (W cnt) cnt where tagof = cast
-instance Tagged Char Cnt256 where tagof = cast
-instance Tagged IString CntW32 where tagof = cast
-instance Typed () where typeof _ = TyUnit
-instance Typed Char where typeof _ = TyEnum 256
-instance Typed Double where typeof _ = TyDouble
-instance Typed Float where typeof _ = TyFloat
-instance Typed IString where typeof _ = TyEnum $ countof (unused :: CntW32)
+texp :: I.Exp -> Type
+texp x = case x of
+  I.CastE _  b -> b
+  I.AllocaE a -> tyPtr a
+  I.AtomE a -> tatom a
+  I.LoadE a -> unTyPtr $ ttvar a
+  I.CallE a bs -> tcall (ttvar a) $ map tatom bs
 
-instance Count cnt => Typed (SuccCnt cnt) where typeof _ = TyUnit
+tcall :: Type -> [Type] -> Type
+tcall a bs = case splitAt (length ts) bs of
+  (_,[]) -> t
+  (_,cs) -> tcall t cs
+  where (t,ts) = unFunTy a
 
-instance Typed a => Typed (Ptr a) where
-  typeof (_ :: Ptr a) = TyPtr $ typeof (unused :: a)
+tyRecord :: [(String,Type)] -> TyDecl
+tyRecord xs = TyRecord [ FieldT a b | (a,b) <- xs]
 
-instance (Typed a, Count cnt) => Typed (Array cnt a) where
-  typeof (_ :: Array cnt a) =
-    TyArray (countof (unused :: cnt)) (typeof (unused :: a))
+tyEnum :: [String] -> TyDecl
+tyEnum bs = TyEnum $ map EnumC bs
 
-instance (Typed a, Typed b) => Typed (a -> b) where
-  typeof (_ :: a -> b) =
-    TyFun (typeof (unused :: a)) (typeof (unused :: b))
+initSt :: St
+initSt = St{ stmts = [] }
 
-  callt n bs = Arg n $ \a -> Lift $ do
-      V s <- evalv a
-      return $ callt n ((s, typeof (unused :: a)) : bs)
+stmt :: Stmt -> M ()
+stmt x = modify $ \st -> st{ stmts = x : stmts st }
 
-instance (Typed a, Typed b) => Typed (a, b) where
-  typeof (_ :: (a, b)) =
-    TyPair (typeof (unused :: a)) (typeof (unused :: b))
+pop_block :: M [Stmt]
+pop_block = do
+  ss0 <- gets stmts
+  modify $ \st -> st{ stmts = [] }
+  return $ reverse ss0
 
-instance Count cnt => Typed (I cnt) where
-  typeof (_ :: I cnt) = TyEnum (countof (unused :: cnt))
+push_block :: [Stmt] -> M ()
+push_block x = modify $ \st -> st{ stmts = reverse x ++ stmts st }
 
-instance Count cnt => Typed (W cnt) where
-  typeof (_ :: W cnt) = TyEnum (countof (unused :: cnt))
+block :: (Exp -> M a) -> Exp -> M (a,[Stmt])
+block f a = do
+  ss0 <- pop_block
+  x <- f a
+  ss1 <- pop_block
+  push_block ss0
+  return (x,ss1)
+ 
+block_ :: (Exp -> M Atom) -> Exp -> M [Stmt]
+block_ f a = liftM snd $ block f a
 
-instance Count cnt => Typed (Idx cnt) where
-  typeof (_ :: Idx cnt) = TyEnum (countof (unused :: cnt))
+assignAtom :: I.Exp -> M Atom
+assignAtom x = do
+  v <- fresh (texp x)
+  stmt $ LetS v x
+  return $ VarA v
 
-instance (Typed a, Count cnt) => Typed (Tag a cnt) where
-  typeof (_ :: Tag a cnt) = TyEnum $ countof (unused :: cnt)
+ifSwitchS :: Atom -> [Stmt] -> [SwitchAlt] -> M [Stmt]
+ifSwitchS _ ys [] = return ys
+ifSwitchS x ys (SwitchAlt a bs : zs) = do
+  ss <- ifSwitchS x ys zs
+  v <- assignAtom $ I.CallE strEqE [x, LitA a]
+  return [IfS v bs ss]
 
-uint :: (Count cnt, Typed (f cnt)) => f cnt -> Integer -> Term (f cnt)
-uint (_ :: f cnt) x
-  | x >= 0 && x < countof (unused :: cnt) = tag x
-  | otherwise = error $ "unsigned integer out of range:" ++ show x
+strEqE :: TVar
+strEqE = TVar "eq" $ tyFun tyIString (tyFun tyIString tyBool)
 
-sint :: (Count cnt, Typed (f cnt)) => f cnt -> Integer -> Term (f cnt)
-sint (_ :: f cnt) x
-  | x >= -y && x < y = tag x
-  | otherwise = error $ "signed integer out of range:" ++ show x
-  where
-  y = countof (unused :: cnt) `div` 2
+ttvar :: TVar -> Type
+ttvar (TVar _ b) = b
 
-wrap :: (Typed a, Typed b) => Term (a -> b)
-wrap = lam_ cast
+atom :: Exp -> M Atom
+atom x = case x of
+  VarE a -> return $ VarA a
+  LitE a -> return $ LitA a
+  DefE a _ -> return $ VarA a
+  _ -> expr x >>= assignAtom
 
-unwrap2 :: (Newtype a b, Typed c) =>
-  (Term b -> Term b -> Term c) -> Term a -> Term a -> Term c
-unwrap2 f = \a b -> f (app unwrap_ a) (app unwrap_ b)
+tvar :: Exp -> M TVar
+tvar x = do
+  a <- atom x
+  case a of
+    VarA v -> return v
+    _ -> error $ "expected variable:" ++ ppShow a
 
-unused :: a
-unused = error "unused"
-
-cast :: (Typed a, Typed b) => Term a -> Term b
-cast f = Lift $ do
-  V a <- evalv f
-  return $ val a
-
-tagofp :: (Typed a, Count cnt) => Term (Ptr a) -> Term (Tag (Ptr a) cnt)
-tagofp = load . tagp
-
-alt0 :: (Typed a, Typed b) => (Term () -> Term b) -> Term a -> Term b
-alt0 f _ = f unit
-
-alt :: (Typed a, Typed b, Typed c) =>
-  (Term (Ptr b) -> Term c) -> Term (Ptr a) -> Term c
-alt f = f . datap
-
-constr :: (Typed a, Count cnt, Typed b) =>
-  Term (Tag (Ptr a) cnt) -> Term (b -> a)
-constr tg = lam_ $ \f -> Lift $ do
-  p <- eval $ alloca unused
-  eval_ $ store (tagp p) tg
-  eval_ $ store (datap p) f
-  return $ load p
-
-constr0 :: (Typed a, Count cnt) => Term (Tag (Ptr a) cnt) -> Term a
-constr0 tg = Lift $ do
-  p <- eval $ alloca unused
-  eval_ $ store (tagp p) tg
-  return $ load p
-
-tagp :: (Typed a, Count cnt) =>
-  Term (Ptr a) -> Term (Ptr (Tag (Ptr a) cnt))
-tagp = gep (tag 0 :: Term W32)
-
-datap :: (Typed a, Typed b) => Term (Ptr a) -> Term (Ptr b)
-datap (f :: Term (Ptr a)) = with_local $ \r -> do
-  p <- evalv f
-  q <- new_local
-  let TySum ts = typeof (unused :: a)
-  out 2 [ vof q, "= getelementptr", vtof p ++ ", i32 0, i32 1" ]
-  out 2 [ vof r, "= bitcast", tyof $ TyPtr $ max_tysum ts, vof q
-        , "to", tof r ]
-
-bitcast :: (Typed a, Typed b) => Term (Ptr a) -> Term (Ptr b)
-bitcast x = with_local $ \q -> do
-  p <- evalv x
-  out 2 [ vof q, "= bitcast", vtof p, "to", tof q ]
-
-gep :: (Typed a, Typed b) => Term i -> Term (Ptr a) -> Term (Ptr b)
-gep f g = with_local $ \q -> do
-  i <- evalv f
-  p <- evalv g
-  out 2 [ vof q, "= getelementptr", vtof p ++ ", i32 0, i32", vof i ]
-
-load :: Typed a => Term (Ptr a) -> Term a
-load f = with_local $ \v -> do
-  p <- evalv f
-  out 2 [ vof v, "= load", vtof p ]
-
-prim2 :: (Typed a, Typed b, Typed c) =>
-  String -> Term a -> Term b -> Term c
-prim2 s f g = with_local $ \c -> do
-  a <- evalv f
-  b <- evalv g
-  out 2 [ vof c, "=", s, vtof a ++ ",", vof b ]
-
-tag :: Typed a => Integer -> Term a
-tag = val . show
-
-store :: Typed a => Term (Ptr a) -> Term a -> Term ()
-store f g = Lift $ do
-  p <- evalv f
-  a <- evalv g
-  out 2 [ "store", vtof a ++ ",", vtof p ]
-  return unit
-
-pair :: (Typed a, Typed b) => Term a -> Term b -> Term (a,b)
-pair f g = Lift $ do
-  p <- eval $ alloca unused
-  eval_ $ store (fst_get p) f
-  eval_ $ store (snd_get p) g
-  return $ load p
-
-fst_get :: (Typed a, Typed b) => Term (Ptr (a,b)) -> Term (Ptr a)
-fst_get = gep (tag 0 :: Term W32)
-
-snd_get :: (Typed a, Typed b) => Term (Ptr (a,b)) -> Term (Ptr b)
-snd_get = gep (tag 1 :: Term W32)
-
-fst_ :: (Typed a, Typed b) => Term (Ptr (a,b) -> Ptr a)
-fst_ = lam_ fst_get
-
-snd_ :: (Typed a, Typed b) => Term (Ptr (a,b) -> Ptr b)
-snd_ = lam_ snd_get
-
-array :: (Count cnt, Typed a) => Term cnt -> [Term a] -> Term (Array cnt a)
-array _ xs = Lift $ do
-  p <- eval $ alloca unused
-  sequence_ [ eval $ store (idx p (int i)) x | (i,x) <- zip [0 .. ] xs ]
-  return $ load p
-
-new_ :: Typed a => Term (a -> Ptr a)
-new_ = lam_ new
-
-alloca :: Typed a => Term a -> Term (Ptr a)
-alloca (_ :: Term a) = with_local $ \p -> do
-  out 2 [ vof p, "= alloca", tof (unused :: V a) ]
-
-alloca'_ :: Typed a => Term (Ptr a)
-alloca'_= alloca unused
-
-new :: Typed a => Term a -> Term (Ptr a)
-new f = Lift $ do
-  p <- eval $ alloca f
-  eval_ $ store p f
-  return p
-
-lam3_ :: (Typed a, Typed b, Typed c, Typed d) =>
-  (Term a -> Term b -> Term c -> Term d) -> Term (a -> b -> c -> d)
-lam3_ f = lam_ $ \x -> lam_ $ \y -> lam_ $ \z -> f x y z
-
-lam2_ :: (Typed a, Typed b, Typed c) =>
-  (Term a -> Term b -> Term c) -> Term (a -> b -> c)
-lam2_ f = lam_ $ \x -> lam_ $ \y -> f x y
-
-app3 :: (Typed a, Typed b, Typed c, Typed d) =>
-  Term (a -> b -> c -> d) -> Term a -> Term b -> Term c -> Term d
-app3 f a b = app (app2 f a b)
-
-app2 :: (Typed a, Typed b, Typed c) =>
-  Term (a -> b -> c) -> Term a -> Term b -> Term c
-app2 f = app . app f
-
-arg :: (Typed a, Typed b) => Id -> (Term a -> Term b) -> Term (a -> b)
-arg s = Arg ("%" ++ s)
-
-unitarg :: Typed a => Term a -> Term (() -> a)
-unitarg x = arg (error "UNITLAM") (\_ -> x)
-
-args :: [(Id,Ty)] -> String
-args xs = parens $ commaSep $ map (\(s,t) -> tyof t ++ " " ++ s) $
-            filter (not . is_tyunit . snd) xs
-
-parens :: String -> String
-parens s = "(" ++ s ++ ")"
-
-argsof :: Typed a => Term a -> [(Id,Ty)]
-argsof (x :: Term a) = case x of
-  Arg s (f :: Term b -> Term c) ->
-    (s, typeof (unused :: b)) : argsof (f (unused :: Term b))
-  _ -> [(error "ARGSOF", typeof (unused :: a))]
-
-define :: Typed a => Decl a -> M ()
-define (Decl n a) = do
-  out 0 ["define", tyof $ snd $ last xs, n ++ args (init xs) ]
-  out 2 ["{"]
-  loop a
-  out 2 ["}"]
-  where
-  xs = argsof a
-  loop :: Typed a => Term a -> M ()
-  loop (x :: Term a) = case x of
-    Arg s f -> loop (f $ val s)
+exprFun :: Type -> Exp -> [Exp] -> M I.Exp
+exprFun t y ys = do
+  v <- tvar y
+  case (v,ys) of
+    (TVar "load" _, [a]) -> liftM I.LoadE $ tvar a
+    (TVar "then" _, [a, b]) -> do
+      ss <- block_ atom a
+      push_block ss
+      expr b
+    (TVar "if" _, [a, b, c]) -> do
+      r <- fresh (tyPtr t)
+      stmt $ LetS r $ I.AllocaE t
+      e <- atom a
+      bb <- block_ (store r) b
+      bc <- block_ (store r) c
+      stmt $ IfS e bb bc
+      return $ I.LoadE r
+    (TVar "unsafe_cast" _, [a]) -> do
+      e <- atom a
+      case e of
+        LitA (TLit l _) -> return $ I.AtomE $ LitA $ TLit l t
+        VarA b -> return $ I.CastE b t
+    (TVar "when" _, [a, b]) -> do
+      e <- atom a
+      bb <- block_ atom b
+      stmt $ WhenS e bb
+      return voidE
+    (TVar "while" _, [a, b]) -> do
+      (e,aa) <- block atom a
+      bb <- block_ atom b
+      stmt $ WhileS aa e bb
+      return voidE
+    (TVar "store" _, [a, b]) -> do
+      r <- tvar a
+      e <- atom b
+      stmt $ StoreS r e
+      return voidE
     _ -> do
-      v <- evalv x
-      out 2 [ "ret"
-            , if is_tyunit (typeof (unused :: a)) then "void" else vtof v
-            ]
+      es <- mapM atom ys
+      return $ I.CallE v es
 
-switch :: (Tagged a cnt, Typed b) =>
-  Term a -> [(Term (Tag a cnt), Term a -> Term b)] -> Term b
-switch a bs = Lift $ do
-  v <- eval a
-  tg <- evalv $ tagof v
-  ls <- sequence $ replicate (length bs) new_label
-  out 2 [ "switch", vtof tg ++ ",", lblof (last ls) ]
-  out 4 ["["]
-  let zs = zip bs ls
-  sequence_
-    [ do u <- evalv t
-         out 4 [commaSep [vtof u, lblof l]]
-      | ((t,_),l) <- init zs
-    ]
-  out 4 ["]"]
-  done <- new_label
-  cs <- mapM (eval_alt v done) zs
-  lblout done
-  return $ phi cs
-
-phi :: Typed a => [(V a, Label)] -> Term a
-phi xs = with_local $ \(v :: V a) ->
-  when (not $ is_tyunit $ typeof (unused :: a)) $
-    out 2 [ vof v, "= phi", tof v, commaSep $ map phi_arg xs ]
-
-phi_arg :: Typed a => (V a, Label) -> String
-phi_arg (x,l) = brackets (vof x ++ ", %" ++ l)
-
-brackets :: String -> String
-brackets s = "[" ++ s ++ "]"
-
-eval_alt :: (Typed a, Typed b) =>
-  Term a -> Label -> ((z, Term a -> Term b), Label) -> M (V b, Label)
-eval_alt a done ((_,f),l)  = do
-  lblout l
-  v <- evalv $ f a
-  out 2 [ "br", lblof done ]
-  m <- gets last_label
-  return (v,m)
-
-lblout :: Label -> M ()
-lblout l = do
-  out 0 [l ++ ":"]
-  modify $ \st -> st{ last_label = l }
-
-lblof :: Label -> String
-lblof l = "label %" ++ l
-
-from_istring_ :: Term (IString -> CString) -- todo:should return immutable cstring
-from_istring_ = lam_ $ \f -> with_local $ \s -> do
-  i <- evalv f
-  p :: V (Ptr CString) <- new_local
-  xs <- gets istrings_tbl
-  out 2 [ vof p, "= getelementptr [" ++ show (length xs)
-        , " x i8*]* @.istrings, i32 0,", vtof i
-        ]
-  out 2 [ vof s, "= load", vtof p]
-
-app :: (Typed a, Typed b) => Term (a -> b) -> Term a -> Term b
-app = App
-
-evalv :: Term a -> M (V a)
-evalv x = case x of
-  Arg a _ -> return $ V a
-  Val a -> return a
-  _ -> reduce x >>= evalv
-
-reduce :: Term a -> M (Term a)
-reduce x = case x of
-  App f a -> case f of
-    Arg _ g -> return $ g a
-    Val (V n) -> reduce $ App (callt n []) a
-    _ -> reduce f >>= \v -> return (App v a)
-  Lift f -> f
-  _ -> return x
-
-val :: Typed a => String -> Term a
-val = Val . V
-
-is_tyunit :: Ty -> Bool
-is_tyunit x = x == TyUnit
-
-tof :: Typed a => V a -> String
-tof (_ :: V a) = tyof $ typeof (unused :: a)
-
-proc :: Typed a => Id -> Term a -> Decl a
-proc a = Decl ("@" ++ a)
-
-lift :: Typed a => M (Term a) -> Term a
-lift = Lift
-
-extern :: Typed a => Id -> Decl a
-extern n = Decl ("@" ++ n) unused
-
-gen_files :: FilePath -> M () -> [String] -> IO ()
-gen_files fn f ss = evalStateT (f >> gen_istrings fn) (St ss (error "gen_files:outH") "")
-
-gen_file :: FilePath -> M () -> M ()
-gen_file fn f = do
-  h <- S.lift $ openFile outFn WriteMode
-  modify $ \st -> st{ outH = h }
-  () <- f
-  modify $ \st -> st{ outH = error "outH" }
-  S.lift $ hClose h
-  where
-  outFn = fn ++ ".ll"
-
-gen_istrings :: FilePath -> M ()
-gen_istrings fn = gen_file ("istrings_" ++ fn) $ do
-  xs <- gets istrings_tbl
-  when (not $ null xs) $ do
-    let ys = [ ("@.istr" ++ show i, cs, show $ length cs + 1)
-               | (i,cs) <- zip [0 :: Int .. ] xs ]
-    mapM_ f ys
-    out 0 ["@.istrings = global [" ++ show (length ys) ++ " x i8*]"]
-    out 2 ["["]
-    mapM_ (g ",") (init ys)
-    g "" (last ys)
-    out 2 ["]"]
-  where
-  f (i,s,n) =
-    out 0 [i, "= private constant [" ++ n ++ " x i8]", const_cstring s ]
-  g s (i,_,n) =
-    out 2 [ "i8* getelementptr ([" ++ n, "x i8]*"
-          , i ++ ", i32 0, i32 0)" ++ s]
-
-string :: String -> Term IString
-string s = Lift $ do
-  xs <- gets istrings_tbl
-  case elemIndex s xs of
-    Just i -> return $ tag $ fromIntegral i
-    Nothing -> error "STRING"
-
-tyof :: Ty -> String
-tyof x = case x of
-  TyEnum{} -> "i" ++ show (sizeof x)
-  TyUnit -> "void"
-  TyPtr a -> tyof a ++ "*"
-  TyPair a b -> "{" ++ tyof a ++ ", " ++ tyof b ++ "}"
-  TyArray i a -> brackets $ show i ++ " x " ++ tyof a
-  TySum xs -> tyof $ ty_sum xs
-  TyDouble -> "double"
-  TyFloat -> "float"
-  TyFun{} -> (tyof $ last xs) ++ parens (commaSep $ map tyof $ init xs) ++ "*"
-    where xs = unfold_tyfun x
-
-unfold_tyfun :: Ty -> [Ty]
-unfold_tyfun x = case x of
-  TyFun a b -> a : unfold_tyfun b
+unApp :: Exp -> [Exp]
+unApp x = case x of
+  AppE a b -> unApp a ++ [b]
   _ -> [x]
 
-ty_sum :: [Ty] -> Ty
-ty_sum xs = TyPair (TyEnum $ genericLength xs) $ max_tysum xs
+unFunTy :: Type -> (Type, [Type])
+unFunTy x = case x of
+  Type "Fun_" ts -> (last ts, init ts)
+  _ -> error $ "function type expected:" ++ ppShow x
+  
+expr :: Exp -> M I.Exp
+expr x = case x of
+  DefE a _ -> case a of
+    TVar "unsafe_alloca" t -> return $ I.AllocaE (unTyPtr t)
+    _ -> return $ I.AtomE $ VarA a
+  VarE a -> return $ I.AtomE $ VarA a
+  LitE{} -> liftM I.AtomE $ atom x
+  AppE{} -> do
+    let (y:ys) = unApp x
+    let (_,ts) = unFunTy $ tof y
+    case splitAt (length ts) ys of
+      (bs,[])
+        | length bs < length ts ->
+          error $ "no partial application:" ++ show x
+        | otherwise -> exprFun (tof x) y ys
+      (bs,cs) -> do
+        let e = apps (y:bs)
+        v <- fresh (tof e)
+        expr $ LetE v e (apps (VarE v : cs))
+  SwitchE a b cs -> do
+    let t = tof b
+    v <- fresh $ tyPtr t
+    stmt $ LetS v $ I.AllocaE t
+    e <- atom a
+    dflt <- block_ (store v) b
+    alts <- mapM (alt v) cs
+    if tof a == tyIString
+      then ifSwitchS e dflt alts >>= mapM_ stmt -- will have void type
+      else stmt $ SwitchS e dflt alts
+    return $ I.LoadE v
+  LetE a b c -> do
+    e <- expr b
+    stmt $ LetS a e
+    expr c
+  LamE{} -> error "unapplied lamda expression"
 
-max_tysum :: [Ty] -> Ty
-max_tysum = maximumBy (\a b -> compare (sizeof a) (sizeof b))
+alt :: TVar -> (Exp,Exp) -> M SwitchAlt
+alt a (LitE b, c) = do
+  ss <- block_ (store a) c
+  return $ SwitchAlt b ss
+alt a (AppE (b@LitE{}) _, c) = alt a (b,c)
+alt a (b,c) = error $ "alt:pattern match failed:" ++ show (a,b,c)
 
-sizeofptr :: Integer
-sizeofptr = 32 -- fixme:non-portable
+store :: TVar -> Exp -> M Atom
+store a b = do
+  e <- atom b
+  stmt $ StoreS a e
+  return voidA
 
-idx :: (Count cnt, Typed a) =>
-  Term (Ptr (Array cnt a)) -> Term (Idx cnt) -> Term (Ptr a)
-idx = flip gep
+fresh :: Type -> M TVar
+fresh a = return $ TVar (uId a "v") a
 
-sizeof :: Ty -> Integer
-sizeof x = case x of
-  TyEnum i -> bitsToEncode i
-  TyUnit -> 0
-  TyPtr{} -> sizeofptr
-  TyPair a b -> sizeof a + sizeof b
-  TyFun{} -> sizeofptr
-  TyArray i a -> i * sizeof a
-  TySum xs -> sizeof $ ty_sum xs
-  TyDouble -> 64
-  TyFloat -> 32
-
-char :: Char -> Term Char
-char = tag . fromIntegral . ord
-
-eval :: Typed a => Term a -> M (Term a)
-eval = liftM Val . evalv
-
-eval_ :: Typed a => Term a -> M ()
-eval_ x = eval x >> return ()
-
-lam_ :: (Typed a, Typed b) => (Term a -> Term b) -> Term (a -> b)
-lam_ = Arg (error "lam")
-
-with_local :: Typed a => (V a -> M ()) -> Term a
-with_local f = Lift $ do
-  v <- new_local
-  f v
-  return $ Val v
-
-vof :: V a -> String
-vof (V v) = v
-
-vtof :: Typed a => V a -> String
-vtof a = unwords [tof a, vof a]
-
-out :: Int -> [String] -> M ()
-out i xs = do
-  h <- gets outH
-  S.lift $ hPutStrLn h $ replicate i ' ' ++ unwords xs
-
-new_local :: M (V a)
-new_local = liftM (V . (++) "%v") $ S.lift freshNm
-
-new_label :: M Label
-new_label = liftM ((++) "LBL") $ S.lift freshNm
-
-unit :: Term ()
-unit = val $ error "UNIT"
-
-call :: Typed a => Decl a -> Term a
-call (Decl n _) = callt n []
-
-declare :: Typed a => Decl a -> M ()
-declare (Decl n (_ :: Term a)) =
-  out 0 ["declare", tyof $ last xs, n ++ args_ (init xs) ]
+fExitS :: [Stmt] -> Maybe [Stmt]
+fExitS ss = case break isExitS ss of
+  (_,[]) -> Nothing
+  (_,[_]) -> Nothing
+  (bs,c:_) -> Just $ bs ++ [c]
   where
-  xs = loop (typeof (unused :: a))
-  loop t = case t of
-    TyFun a b -> [a] ++ loop b
-    _ -> [t]
+  isExitS (CallS a _) = vtvar a == "exit"
+  isExitS _ = False
 
-args_ :: [Ty] -> String
-args_ xs = parens $ commaSep $ map tyof $ filter (not . is_tyunit) xs
+fVoidT :: Type -> Maybe Type
+fVoidT (Type "Fun_" xs0) | any isVoidTy xs =
+  Just $ Type "Fun_" $ filter (not . isVoidTy) xs ++ [x]
+  where
+    xs = init xs0
+    x = last xs0
+fVoidT _ = Nothing
 
-const_cstring :: String -> String
-const_cstring s = "c\"" ++ concatMap const_char s ++ "\\00\""
+fSynT :: Type -> Maybe Type
+fSynT (Type a _) = case a of
+  "Idx_" -> Just $ I.Type "W_" [I.Type "Cnt32" []]
+  "IString_" -> Just $ I.Type "Ptr_" [I.Type "Char_" []]
+  _ -> Nothing
 
-const_char :: Char -> String
-const_char c
-  | c < ' ' || c > '~' || c == '\\' = encode_char c
-  | otherwise = [c]
+fCastE :: I.Exp -> Maybe I.Exp
+fCastE (I.CastE a b) | ttvar a == b = Just $ I.AtomE $ VarA a
+fCastE _ = Nothing
 
-encode_char :: Enum a => a -> String
-encode_char c =
-  '\\' : (if i <= 0xf then "0" else "") ++ map toUpper (showHex i "")
-  where i = fromEnum c
+dModule :: FilePath -> String -> [String] -> [Define] -> IO ()
+dModule outdir a bs cs = do
+  let m = Module a (map Import bs) cs
+  let m1 = 
+        rewriteBi fCastE $
+        rewriteT $
+        rewriteBi fExitS $
+        rewriteBi fNoOpS $
+        rewriteBi fVoidD $
+        rewriteBi fVoidE $
+        rewriteBi fVoidS m
+  x <- cmdArgs argsDesc
+  case march x of
+    C -> cModules outdir (readable x) m1
+    LLVM -> L.dModule outdir m1
 
-bitsToEncode :: Integer -> Integer
-bitsToEncode 0 = 0
-bitsToEncode i = ceiling $ logBase 2 (fromIntegral i :: Double)
+rewriteT :: Data a => a -> a
+rewriteT x = rewriteBi fVoidT $ rewriteBi fSynT x
 
-freshNm :: IO String
-freshNm = liftM (show . hashUnique) newUnique
+addGTyDecls :: [(Type,TyDecl)] -> ()
+{-# NOINLINE addGTyDecls #-}
+addGTyDecls xs = unsafePerformIO $ modifyMVar_ gTyDecls $ \ys ->
+  return $ union (rewriteT xs) ys
 
-commaSep :: [String] -> String
-commaSep = concat . intersperse ", "
+defn :: Typed a => E a -> Define
+defn x = case unE x of
+  DefE (TVar a0 t) b -> flip evalState initSt $ do
+    let a = if a0 == "main_" then "main" else a0
+    let (vs,c) = unLam b
+    e <- atom c
+    ss <- pop_block
+    return $ Define (fst $ unFunTy t) a vs $ ss ++ [ReturnS e]
+  _ -> error "defn"
 
-inttag :: (INT a, Typed a, Count cnt) => Integer -> Term (Tag a cnt)
-inttag = inttagt unused
+unLam :: Exp -> ([TVar],Exp)
+unLam x = case x of
+  LetE a b c -> let (vs,e) = unLam c in (vs, LetE a b e)
+  LamE (TVar a b) f -> let (vs,e) = unLam $ f $ VarE v in (v:vs, e)
+    where v = TVar (a ++ "_") b
+  _ -> ([],x)
+    
+appE :: (Typed a, Typed b) => E (a -> b) -> E a -> E b
+appE a b = case unE a of
+  LamE _ f -> setE (f $ unE b)
+  _ -> setE (AppE (unE a) (unE b))
+  
+data Array_ cnt a
+data Pointer_ p a
 
-inttagt :: (INT a, Typed a, Count cnt) => a -> Integer -> Term (Tag a cnt)
-inttagt (_ :: a) i = Lift $ do
-  V s :: V a <- evalv (int i)
-  return $ val s
+class Load_ a
+class Store_ a
 
-chartag :: Char -> Term (Tag Char Cnt256)
-chartag = cast . char
+data IString_
 
-stringtag :: String -> Term (Tag IString CntW32)
-stringtag = cast . string
+data I_ a
+data W_ a
+data Idx_ a
 
-defaulttag :: Tagged a cnt => Term (Tag a cnt)
-defaulttag = val $ error "DEFAULT"
+instance Count a => Arith_ (I_ a)
+instance Count a => Arith_ (W_ a)
+instance Arith_ Double_
+instance Arith_ Float_
+
+instance Floating_ Double_
+instance Floating_ Float_
+
+instance Count a => Nmbr (I_ a)
+instance Count a => Nmbr (W_ a)
+instance Count a => Nmbr (Idx_ a)
+instance Nmbr Double_
+instance Nmbr Float_
+
+class Ord_ a
+class Eq_ a
+
+instance Eq_ Char_
+instance Eq_ IString_
+
+instance Count a => Ord_ (I_ a)
+instance Count a => Ord_ (W_ a)
+instance Ord_ Char_
+instance Ord_ Double_
+instance Ord_ Float_
+
+instance Count a => Eq_ (W_ a)
+instance Count a => Eq_ (I_ a)
+instance Count a => Eq_ (Idx_ a)
+
+count_ :: (Count ca, Count cb, Typed a, Typed p) =>
+  E (Pointer_ p (Array_ ca a) -> W_ cb)
+count_ = lamE "" f
+  where
+  f :: (Count ca, Count cb, Typed a, Typed p) =>
+       E (Pointer_ p (Array_ ca a)) -> E (W_ cb)
+  f (_ :: E (Pointer_ p (Array_ cnt a))) =
+    nmbrE (show $ countof (unused :: cnt))
+
+data Char_
+data Double_
+data Float_
+
+data Tag a
+
+class Typed a => Count a where
+  countof :: a -> Integer
+  idx_max_ :: E (Idx_ a)
+  idx_max_ = nmbrE (show $ pred $ countof (unused :: a))
+
+instance Tagged a => Tagged (Tag a) where
+  tags (_ :: Tag a) = tags (unused :: a)
+
+class StorePtr a
+class Typed a => Nmbr a
+class Nmbr a => Arith_ a
+class Floating_ a
+
+tyPair :: Type -> Type -> Type
+tyPair a b = Type "Pair_" [a,b]
+
+unTyPtr :: Type -> Type
+unTyPtr (Type _ [a]) = a
+unTyPtr _ = error "unTyPtr"
+
+tyPtr :: Type -> Type
+tyPtr a = Type "Ptr_" [a]
+
+tyBool :: Type
+tyBool = tyPrim "Bool_"
+
+enumTyDecls :: Typed a => [String] -> a -> [(Type, TyDecl)]
+enumTyDecls ss a = [(ty a, tyEnum ss)]
+
+class Tagged a where
+  tags :: a -> [String]
+  
+taggedTyDecls :: Typed a =>
+  [[(Type,TyDecl)]] -> [(String,Type)] -> a -> [(Type, TyDecl)]
+taggedTyDecls xs ys z = nub $ concat xs ++
+  [ (Type (s ++ "tag") [], tyEnum $ map fst ys)
+  , (t, TyTagged [ ConC a b | (a,b) <- ys ])
+  ]
+  where
+    t@(Type s _) = ty z
+
+recordTyDecls :: Typed a =>
+  [[(Type,TyDecl)]] -> [(String,Type)] -> a -> [(Type, TyDecl)]
+recordTyDecls xs ys z =
+  nub $ concat xs ++ [(ty z, TyRecord [ FieldT a b | (a,b) <- ys ])]
+
+class Typed a where
+  ty :: a -> Type
+  tydecls :: a -> [(Type, TyDecl)]
+  tydecls _ = []
+
+tydecls_ :: (Typed a, Typed b) => a -> b -> [(Type, TyDecl)]
+tydecls_ a _ = tydecls a
+
+instance Count a => Typed (I_ a) where
+  ty _ = Type "I_" [ty (unused :: a)]
+  
+instance Count a => Typed (W_ a) where
+  ty _ = Type "W_" [ty (unused :: a)]
+
+instance Count a => Typed (Idx_ a) where
+  ty _ = Type "Idx_" [ty (unused :: a)]
+
+instance Typed a => Typed (Tag a) where
+  ty _ = Type (s ++ "tag") []
+    where I.Type s _ = ty (unused :: a)
+
+instance Typed () where
+  ty _ = tyVoid
+  
+instance (Typed a, Typed b) => Typed (a -> b) where
+  ty _ = tyFun (ty (unused :: a)) (ty (unused :: b))
+  tydecls _ =
+    tydecls (unused :: a) ++ tydecls (unused :: b)
+
+instance (Count cnt, Typed a) => Typed (Array_ cnt a) where
+  ty _ = tyArray (countof (unused :: cnt)) (ty (unused :: a))
+  tydecls _ = tydecls (unused :: a)
+  
+tyArray :: Integer -> Type -> Type
+tyArray a b = Type "Array_" [tyCnt a, b]
+
+instance Typed Char_ where
+  ty _ = tyChar
+  
+instance Typed Double_ where
+  ty _ = tyDouble
+  
+instance Typed Float_ where
+  ty _ = tyFloat
+  
+instance Typed IString_ where
+  ty _ = tyIString
+  
+instance (Typed p, Typed a) => Typed (Pointer_ p a) where
+  ty _ = tyPtr (ty (unused :: a))
+  tydecls _ = tydecls (unused :: a)
+
+isVoidTy :: Type -> Bool
+isVoidTy = (==) tyVoid
+
+tyVoid :: Type
+tyVoid = tyPrim "Void_"
+
+tyPrim :: String -> Type
+tyPrim a = Type a []
+
+letE :: (Typed a, Typed b) => String -> E a -> (E a -> E b) -> E b
+letE a0 b f =
+  let a = uId a0 a0 in
+    setE (LetE (TVar a (tof $ unE b)) (unE b) $ unE $ f $ varE a)
+
+tyFun :: Type -> Type -> Type
+tyFun a b = case b of
+  Type "Fun_" cs -> Type "Fun_" (a:cs)
+  _ -> Type "Fun_" [a,b]
+
+tof :: Exp -> Type
+tof x = case x of
+  VarE a -> ttvar a
+  DefE a _ -> ttvar a
+  LamE (TVar a b) f -> tyFun b (tof $ f $ VarE $ TVar a b)
+  AppE a _ -> case tail ts of
+    [] -> t
+    bs -> Type "Fun_" $ bs ++ [t]
+    where (t,ts) = unFunTy $ tof a
+  SwitchE _ b _ -> tof b
+  LitE (TLit _ b) -> b
+  LetE _ _ c -> tof c
+
+fixArity :: Int -> Type -> Type
+fixArity 0 x = x
+fixArity n x = case splitAt n ts of
+  (_,[]) -> x
+  (bs,cs) -> Type "Fun_" $ bs ++ [Type "Fun_" $ cs ++ [t]]
+  where
+    (t,ts) = unFunTy x
+    
+arityDefE :: Typed a => Int -> String -> E a -> E a
+arityDefE n a b = setE (DefE (TVar a (fixArity n $ tof e)) e)
+  where e = unE b
+
+defE :: Typed a => String -> E a -> E a
+defE a b = arityDefE (arityDef $ unE b) a b
+
+arityDef :: Exp -> Int
+arityDef = length . fst . unLam
+
+extern :: Typed a => E (IString_ -> IString_ -> a)
+extern = lamE "" $ \x -> lamE "" $ \y ->
+  let v = unStringE x in arityDefE (read $ unStringE y) v (varE v)
+
+unStringE :: E IString_ -> String
+unStringE x = case unE x of
+  LitE (TLit (StringL s) _) -> s
+  _ -> error "unStringE"
+
+varE :: Typed a => String -> E a
+varE = f (error "unused:varE")
+  where
+  f :: Typed a => a -> String -> E a
+  f a s = setE (VarE $ TVar s (ty a))
+
+lamE :: (Typed a, Typed b) => String -> (E a -> E b) -> E (a -> b)
+lamE s (f :: (E a -> E b)) =
+  setE (LamE (TVar s (ty (unused :: a))) (\e -> unE (f (setE e))))
+
+switchE :: (Typed a, Typed b) => E a -> E b -> [(E a, E b)] -> E b
+switchE a b cs = setE (SwitchE (unE a) (unE b)
+                    [ (unE x, unE y) | (x,y) <- cs ])
+
+switchE_ :: (Tagged a, Typed a, Typed b) => E a -> [(E a, E b)] -> E b
+switchE_ (a :: E a) bs = case tags (unused :: a) \\ xs of
+  [] -> switchE a (snd $ last bs) (init bs)
+  ts -> error $ "unmatched tag(s):" ++ unwords (take 10 ts)
+  where
+    xs = map (get_tag . unE . fst) bs
+
+get_tag :: Exp -> String
+get_tag x = case x of
+  AppE a _ -> get_tag a
+  LitE (TLit (EnumL a) _) -> a
+  _ -> error "unused:get_tag"
+  
+litE :: Lit -> Type -> Exp
+litE a b = LitE (TLit a b)
+
+charE :: Char -> E Char_
+charE x = setE $ litE (CharL x) tyChar
+
+stringE :: String -> E IString_
+stringE x = setE $ litE (StringL x) tyIString
+
+nmbrE :: Nmbr a => String -> E a
+nmbrE = f (error "unused:nmbrE")
+  where
+  f :: Nmbr a => a -> String -> E a
+  f a i = setE $ litE (NmbrL i) (ty a)
+
+tyChar :: Type
+tyChar = tyPrim "Char_"
+
+tyDouble :: Type
+tyDouble = tyPrim "Double_"
+
+tyFloat :: Type
+tyFloat = tyPrim "Float_"
+
+tyIString :: Type
+tyIString = tyPrim "IString_"
+
+tyCnt :: Integer -> Type
+tyCnt x = tyPrim ("Cnt" ++ show x)
+
+un :: (Typed a, Typed b, Typed p, Load_ p) =>
+      E (IString_ -> Pointer_ p a -> b)
+un = varE "un"
+
+tg :: (Typed a) => E (IString_ -> a)
+tg = f (error "unused:tg")
+  where
+    f :: (Typed a) => a -> E (IString_ -> a)
+    f a = lamE "" $ \x -> setE $ litE (EnumL $ unStringE x) (ty a)
+
+storeE :: (Typed a, Typed p, Store_ p) => E (Pointer_ p a -> a -> ())
+storeE = varE "store"
+
+fld :: (Typed a, Typed b, Typed p) =>
+       E (IString_ -> Pointer_ p a -> Pointer_ p b)
+fld = lamE "" $ \x -> lamE "" $ \y -> appE (varE $ unStringE x ++ "fld") y
+         
+unwrap_ :: (Typed a, Typed b) => E (IString_ -> a -> b)
+unwrap_ = lamE "" $ \_ -> lamE "" $ \a -> setE (unE a)
+
+unwrapptr_ :: (Typed a, Typed b, Typed p) =>
+              E (IString_ -> Pointer_ p a -> Pointer_ p b)
+unwrapptr_ = lamE "" $ \_ -> lamE "" $ \a -> setE (unE a)
+
+mk :: (Typed a) => E (IString_ -> a)
+mk = varE "mk"
+
+uni :: (Typed a) => E (IString_ -> a)
+uni = lamE "" $ \_ -> setE (LitE voidL)
+
+voidL :: TLit
+voidL = TLit VoidL tyVoid
+
+voidA :: Atom
+voidA = LitA voidL
+
+voidE :: I.Exp
+voidE = I.AtomE voidA
+
+nt :: (Typed a, Typed b) => E (IString_ -> a -> b)
+nt = lamE "" $ \_ -> lamE "" $ \a -> setE (unE a)
+
+tagv :: (Typed a, Typed b, Typed p, Load_ p) => E (Pointer_ p a -> b)
+tagv = varE "tagv"
+
+unsafe_cast_ :: (Typed a, Typed b) => E (a -> b)
+unsafe_cast_ = varE "unsafe_cast"

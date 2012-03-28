@@ -1,0 +1,7 @@
+Changes since the last release:
+  - eliminated inline Haskell code in pec syntax (that was an ugly idea :)
+  - rewrite to better support multiple backends
+  - added C backend support
+  - now using grm instead of bnfc
+  - added stack, queue, deque container types to pec lib
+  - more test cases including some project euler

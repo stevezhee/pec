@@ -1,0 +1,81 @@
+module Data.Queue
+
+exports
+  Queue
+  any
+  del
+  empty
+  filter
+  find
+  find_idx
+  fold
+  foreach
+  foreach_idx
+  is_empty
+  is_full
+  map
+  pop
+  push
+  put
+  queue
+
+imports
+  Prelude
+  Data.Deque as D
+
+where
+
+type Queue cnt a = | Queue (D.Deque #cnt a)
+
+queue :: #cnt -> Queue #cnt a
+queue cnt => Queue (D.deque cnt)
+
+push :: a -> Ptr (Queue #cnt a) -> Bool
+push a p => D.push_front a (queue_unwrapptr p)
+
+pop :: Ptr (Queue #cnt a) -> Maybe a
+pop p => D.pop_back (queue_unwrapptr p)
+
+del :: Ptr (Queue #cnt a) -> Bool
+del p => D.del_back (queue_unwrapptr p)
+
+empty :: Ptr (Queue #cnt a) -> ()
+empty p => D.empty (queue_unwrapptr p)
+
+is_empty :: { Load p } => Pointer p (Queue #cnt a) -> Bool
+is_empty p => D.is_empty (queue_unwrapptr p)
+
+is_full :: { Load p } => Pointer p (Queue #cnt a) -> Bool
+is_full p => D.is_full (queue_unwrapptr p)
+
+put :: { Load p } =>
+  (a -> ()) -> Pointer p (Queue #cnt a) -> ()
+put f p => D.put f (queue_unwrapptr p)
+
+map :: (a -> b) -> Ptr (Queue #cnt a) -> Queue #cnt b
+map f p => Queue (D.map f (queue_unwrapptr p))
+
+foreach :: { Load p } =>
+  (Pointer p a -> ()) -> Pointer p (Queue #cnt a) -> ()
+foreach f p => D.foreach f (queue_unwrapptr p)
+
+foreach_idx :: { Load p } =>
+  (Idx #cnt -> ()) -> Pointer p (Queue #cnt a) -> ()
+foreach_idx f p => D.foreach_idx f (queue_unwrapptr p)
+
+fold :: { Load p } => (b -> a -> b) -> b -> Pointer p (Queue #cnt a) -> b
+fold f b p => D.fold f b (queue_unwrapptr p)
+
+any :: { Load p } => (a -> Bool) -> Pointer p (Queue #cnt a) -> Bool
+any f p => D.any f (queue_unwrapptr p)
+
+find :: { Load p } =>
+  (a -> Bool) -> Pointer p (Queue #cnt a) -> Maybe (Pointer p a)
+find f p => D.find f (queue_unwrapptr p)
+
+find_idx :: { Load p } =>
+  (a -> Bool) -> Pointer p (Queue #cnt a) -> Maybe (Idx #cnt)
+find_idx f p => D.find_idx f (queue_unwrapptr p)
+
+filter :: (a -> Bool) -> Ptr (Queue #cnt a) -> ()
+filter f p => D.filter f (queue_unwrapptr p)

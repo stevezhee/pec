@@ -1,0 +1,78 @@
+data Module
+  | Module "module" uident "{" ExportDList ImportDList TypeDList InstDList VarDList "}"
+
+data ExportD
+  | TypeEx "export" uident
+  | VarEx "export" lident
+
+data ImportD | ImportD "import" uident AsSpec
+
+data AsSpec
+  | AsAS "as" uident
+  | EmptyAS 
+
+data TypeD | TypeD "type" uident VarList "=" TyDecl
+data VarD | VarD lident DeclSym Exp
+data InstD | InstD "instance" uident Type
+
+data DeclSym
+  | Macro "=>"
+  | Define "="
+
+data TyDecl
+  | TyRecord "record" "{" FieldTList "}"
+  | TyTagged "tagged" ConCList
+  | TyEnum "enum" EnumCList
+  | TySyn "synonym" Type
+  | TyNewtype "newtype" uident Type
+  | TyUnit "unit" uident
+
+data Exp
+  | LetE "let" lident DeclSym Exp "in" Exp
+  | LamE "\\" lident "->" Exp
+  | SwitchE "switch" Exp "of" Default "{" SwitchAltList "}"
+  | AppE "(" Exp Exp ")"
+  | AscribeE "(" Exp "::" Type ")"
+  | VarE lident
+  | LitE Lit
+
+data Default
+  | DefaultNone
+  | DefaultSome Exp
+
+data Lit
+  | CharL char
+  | StringL string
+  | NmbrL number
+
+data Type
+  | TyCxt "{" CxtList "}" "=>" Type
+  | TyFun "(" Type "->" Type ")"
+  | TyVoid "VoidT"
+  | TyConstr "(" uident TypeList ")"
+  | TyVarT lident
+
+data SwitchAlt | SwitchAlt Exp "->" Exp
+
+data Cxt | Cxt uident VarList
+
+data ConC | ConC uident Type
+
+data EnumC | EnumC uident
+
+data FieldT | FieldT uident "::" Type
+
+data Var | Var lident
+
+list ExportDList ExportD empty terminator ";" vert
+list ImportDList ImportD empty terminator ";" vert
+list VarDList VarD empty terminator ";" vert
+list TypeDList TypeD empty terminator ";" vert
+list InstDList InstD empty terminator ";" vert
+list SwitchAltList SwitchAlt empty terminator ";" vert
+list EnumCList EnumC nonempty separator "|" horiz
+list ConCList ConC nonempty separator "|" horiz
+list FieldTList FieldT nonempty separator "," horiz
+list VarList Var empty separator "" horiz
+list TypeList Type empty separator "" horiz
+list CxtList Cxt nonempty separator "," horiz

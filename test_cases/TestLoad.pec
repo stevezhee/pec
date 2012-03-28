@@ -1,8 +1,9 @@
-module TestLoad exports all
+module TestLoad
+
+imports
+  Prelude
 
 where
-
-import Prelude
 
 main :: () -> I32
 main () = do

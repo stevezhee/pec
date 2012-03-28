@@ -1,12 +1,13 @@
-module TestTuple exports all
+module TestTuple
+
+imports
+  Prelude
 
 where
 
-import Prelude
-
 // () is a tuple with no elements.
-// it gets compiled as "void" in the LLVM code
-main :: () -> W32
+// it gets compiled as "void" in the LLVM/C code
+main :: () -> I32
 main () = do
   testUnit ()
   testPair ()
@@ -28,14 +29,12 @@ pairf (a,b) = do // tuple pattern match on left hand side
 testPair :: () -> ()
 testPair () = do
   p = new ('a',True) // p :: Ptr (Char, Bool)
-
   (c,b) = p // pattern match.  note that c :: Ptr Char and b :: Ptr Bool
   putCh @c
   putCh @p.fst // using record syntax to extract the first element of a pair
 // note that it returns a pointer to the element within the record
-  putCh @(fst p) // using function syntax for the same thing
+  putCh @(fst p) // using a function to do the same thing
   assert @b
-
   c <- 'b'
   b <- False
   putCh @c
@@ -81,11 +80,12 @@ testTuple () = do
   tuplef (new (True, 'c', 7))
   putLn "done"
 
-type Person = // the standard record example
+type Person = // record example
   { name :: IString
   , middle_initial :: Char
   , city :: IString
-  , zipcode :: W32 }
+  , zipcode :: W32
+  }
 // order of elements doesn't matter, so this is exactly the same as
 // type Person =
 //   { zipcode :: W32
@@ -107,8 +107,8 @@ testRecord () = do
   assert (@p.stuff == 'b')
   putCh @p.stuff
   y = { name = "Brett", city = "Beverly Hills", zipcode = 90210, middle_initial = 'A' }
-// since pec has side effects, record labels are sorted prior to execution.
-// having a side effecting function within a record initilization is considered bad form :)
+// record labels are always placed in canonical order (i.e. sorted by name)
+// side-effecting functions should not be used within a record initilization
 
   q = new y
   putLn @q.name

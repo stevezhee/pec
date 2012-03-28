@@ -1,0 +1,30 @@
+module Euler145
+
+imports
+  Prelude
+
+where
+
+main :: () -> I32
+main () = do
+  t = new (0 :: W32)
+  times (1000000000 :: W32)
+    (\i -> when (is_rev i) (inc t))
+  assert (@t == 608720)
+  putW @t
+  0
+
+is_rev x => branch
+  (x % 10) == 0 -> False
+  | do
+    i = new (x + rev x)
+    while ((@i > 0) && (is_odd @i)) (i /= 10)
+    @i == 0
+
+is_odd x => (x % 2) == 1
+
+rev x => do
+  j = new 0
+  for x (\i -> i > 0) (\i -> i / 10)
+    (\i -> j <- (@j * 10) + (i % 10))
+  @j

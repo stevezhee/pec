@@ -1,0 +1,17 @@
+module Euler1
+
+imports
+  Prelude
+
+where
+
+main :: () -> I32
+main () = do
+  t = new (0 :: W32)
+  times 1000
+    (\i -> when (is_factor i 3 || is_factor i 5) (t += i))
+  assert (@t == 233168)
+  putW @t
+  0
+
+is_factor a b => (a % b) == 0

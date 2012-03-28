@@ -1,6 +1,7 @@
 The developement of pec would not have been possible without the following free software:
   - ghc http://haskell.org/ghc/
   - llvm http://llvm.org/
+  - gcc http://gcc.gnu.org/
   - bnfc http://www.cse.chalmers.se/research/group/Language-technology/BNFC/
   - happy http://haskell.org/happy/
   - alex http://haskell.org/alex/

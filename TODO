@@ -1,29 +1,47 @@
 todo
-- do language design doc
-- do compiler architecture doc
-- add qualified names
-- make read only pointers
-- "Show" instances
-- "Eq" instances
+- implement binding to c code and c libs
+- have pec manage the namespaces, not ghc
+- have pec do the type inference, not ghc
+- Print, Show, Eq instances
+- implement read-eval-print-loop interpreter (REPL)
+- make libraries consistently use underscore (or camel case)
+- make sure build deps are correct
 - allow operators in export lists
-- add import "as"
 - add import list(?)
-- make the inline Haskell code (i.e. '>') play nice with comments
 - implement downward closures(?)
-- properly create .ll files (i.e. with declare statements)
-- implement puts that doesn't tack on a newline
 - haddock'ize modules
-- write more example code (project euler or language shootout)
-- add -i flag to search other directories
-- add c code generation
-- report llvm bug
+- write more example code (project euler,language shootout,etc.)
 - add state machine optimization(?)
-- don't rebuild files that haven't changed (unfortunately the istrings complicate things)
 - add warning when _ is used as a name
 - add check to ensure that variables are SSA
-- add check to prevent recursion
+- add check to prevent recursion (what about function pointers?)
+- allow for _ <- foo () (not just b <- foo ())
+- improve compiler coverage
+- revisit llvm operators do determine correct flags, e.g. nuw, exact
+- implement unfold for containers
 
 done
+- update docs for release
+- release grm
+- properly create .ll files (i.e. with declare statements)
+- do language design doc
+- do compiler architecture doc
+- add/reinstate llvm code generation
+- implement filter, map, empty, fold, etc. for all containers
+- add deps/building to grm
+- Deque printing is not working
+- error if module name doesn't match filename
+- add a way to print ints
+- rename files to make more consistent
+- implement puts that doesn't tack on a newline
+- add -i flag to search other directories
+- use & and && instead of &&& and && by changing the name of and and band(?), same for or...
+- don't rebuild files that haven't changed (unfortunately the istrings complicate things)
+- add c code generation
+- make the inline Haskell code (i.e. '>') play nice with comments
+- add import "as"
+- add qualified names
+- make read only pointers
 - datatype: string buffer
 - datatype: stack
 - implement prelude/ other library functions

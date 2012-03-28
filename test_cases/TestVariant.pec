@@ -1,28 +1,35 @@
-module TestVariant exports all
+module TestVariant
+
+imports
+  Prelude
 
 where
 
-import Prelude
-
-main :: () -> W32
+main :: () -> I32
 main () = do
   testEnum ()
   testNewtype ()
   testNewtypePoly ()
-  testVariant ()
   testUnit ()
+  testVariant ()
   0
 
-type Color = | Red | Blue | Green // the standard enum example
+type Color = | Red | Blue | Green // the standard enum example, order doesn't matter
 
+type PHColor x = | PHRed | PHBlue // phantom type enum
+
+instance Eq Color // eq and ne can be derived for enums
+instance Eq (PHColor x)
+
+// enums can't be automatically cast to ints, that leads to maintenance problems
 unColor :: Color -> W32
-unColor c = case c of
+unColor c = switch c of
   Red -> 0
   Blue -> 1
-  Green -> 2
+  Green -> 2 // All tags must be matched.  Removing this line will cause a compile time error.
 
 sColor :: Color -> IString
-sColor c = case c of // case on enums is by value
+sColor c = switch c of // switch on enums is by value
   Red -> "Red"
   Blue -> "Blue"
   Green -> "Green"
@@ -38,9 +45,9 @@ unita _ = () // todo(?): unita Unit = ()
 testUnit :: () -> ()
 testUnit () = do
   putLn "testunit"
-  x = Unit // singleton types are compiled into "void" in LLVM
+  x = Unit // singleton types are compiled into "void" in LLVM/C
   unita x
-  unitf ()
+  _ = unitf ()
   unita Unit
   putLn "done"
 
@@ -48,7 +55,7 @@ testEnum :: () -> ()
 testEnum () = do
   putLn "testEnum"
   assert (Red == Red)
-  x = Green // enum types are compiled into unsigned ints in LLVM
+  x = Green // enum types are compiled into unsigned ints in LLVM/C
   putLn (sColor x)
   assert (Green == x)
   assert (x == Green)
@@ -64,30 +71,29 @@ testEnum () = do
   assert (@p == Green)
   assert (unColor @p == 2)
   assert (unColor Blue == 1)
-  case Red of
+  switch Red of
     Green -> assert False
     Red -> assert True
     color -> assert (color != Blue)
-  case x of
+  switch x of
     Green -> assert True
     Red -> assert False
     Blue -> assert False
+  pc = (PHRed :: PHColor Bool)
+  assert (pc == PHRed)
+//  assert (pc == (PHRed :: PHColor ())) // type error
   putLn "done"
 
 type Meters = | M W32 // newtype.  A variant with only one tag
 
->instance EQ Meters_ where
->  eq = unwrap2 eq
->  ne = unwrap2 ne
-
-type MyA a = | My a // polymorphic newtype
+instance Eq Meters
 
 testNewtype :: () -> ()
 testNewtype () = do
   putLn "testNewtype"
   assert (M 7 == M 7)
 // newtypes are constructed by juxtaposition like in Haskell
-// newtypes are compiled into whatever the underlying type is in LLVM (i.e. the tag is eliminated)
+// newtypes are compiled into whatever the underlying type is in LLVM/C (i.e. the tag is eliminated)
   x = M 12
   assert (x == M 12)
   p = new (M 7)
@@ -95,20 +101,22 @@ testNewtype () = do
   assert (@p == M 7)
   p <- M 47
   assert (@p == M 47)
-  assert (47 == unwrap @p) // instead of using "case" to extract values from newtypes, pec provides the polymorphic "unwrap" function
+  assert (47 == m_unwrap @p) // instead of using "case" to extract values from newtypes, a function is created which will unwrap the type, it has the form <constr>_unwrap.  Also <constr>_unwrapptr is created which will safely cast a newtype ptr to a ptr.
   p <- M 1
-  i = unwrap @p
+  i = m_unwrap @p
   assert (i == 1)
   putLn "done"
+
+type MyA a = | My a // polymorphic newtype
 
 testNewtypePoly :: () -> ()
 testNewtypePoly () = do
   putLn "testNewtypePoly"
   x = My 'c'
   p = new x
-  assert (unwrap @p == 'c')
+  assert (my_unwrap @p == 'c')
   q = new (My True)
-  assert (unwrap @q)
+  assert (my_unwrap @q)
   putLn "done"
 
 testVariant :: () -> ()
@@ -116,7 +124,7 @@ testVariant () = do
   putLn "testVariant"
   p = new (Left False)
   p <- Right 'c' // p :: Ptr (Either Bool Char)
-// variants must be accessed via a pointer
+  // variants must be accessed via a pointer
   case p of
     Left a -> do
       assert @a
@@ -129,7 +137,7 @@ testVariant () = do
     Right b -> do
       putCh @b
       assert False
-  q = new Nothing
+  q = new (Nothing :: Maybe Bool)
   case q of
     Nothing -> assert True
     Just _ -> assert False
@@ -137,4 +145,14 @@ testVariant () = do
   case q of
     Just b -> assert @b
     _ -> assert False
+  r = new (Left True)
+  case r of
+    Left b -> assert @b
+    Right _ -> assert False
+  r <- Right (27 :: W32)
+  case r of
+    Left _ -> assert False
+    Right i -> do
+      putW @i
+      assert True
   putLn "done"

@@ -1,0 +1,35 @@
+module Euler14
+
+imports
+  Prelude
+
+where
+
+main :: () -> I32
+main () = do
+  i = new (1 :: W32)
+  m = new (1 :: W32)
+  n = new (1 :: W32)
+  times 1000000
+    (\i -> do
+      l = collatz_len i
+      when (l > @m)
+        (do
+          m <- l
+          n <- i
+        )
+    )
+  putW @n
+  assert (@n == 837799)
+  0
+
+collatz_len n => do
+  t = new (1 :: W32)
+  for n (\i -> i > 1) collatz (\_ -> inc t)
+  @t
+
+collatz n => branch
+  is_odd n -> (3 * n) + 1
+  | n / 2
+
+is_odd n => (n & 0x1) == 0x1

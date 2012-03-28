@@ -1,0 +1,175 @@
+data Module
+  | Module "module" Modid ExportDecls ImportDecls "where" "{" TopDeclList "}"
+
+data ExportDecls
+  | ExpListD "exports" "{" ExportList "}"
+  | ExpAllD
+
+data ImportDecls
+  | ImpListD "imports" "{" ImportList "}"
+  | ImpNoneD
+
+data Export
+  | TypeEx Con Spec
+  | VarEx Var
+
+data Import | Import Modid AsSpec
+
+data AsSpec
+  | AsAS "as" Modid
+  | EmptyAS 
+
+data Spec
+  | Neither
+  | Decon "(" "." ")"
+  | Both "(" ".." ")"
+
+data TopDecl
+  | ExternD "extern" ExtNm Var "::" Type
+  | TypeD "type" Con VarList "=" TyDecl
+  | TypeD0 "type" Con VarList
+  | AscribeD Var "::" Type
+  | VarD Var DeclSym Exp
+  | ProcD Var Exp0List DeclSym Exp
+  | InstD "instance" Con Type
+
+data DeclSym
+  | Macro "=>"
+  | Define "="
+
+data ExtNm
+  | SomeNm string
+  | NoneNm 
+
+group {
+
+data Exp
+  | BlockE "do" "{" Exp5List "}"
+  | _ Exp5
+
+data Exp5
+  | LetS Exp4 DeclSym Exp -- sugar which can only appear in a block and lhs only var
+  | LetE "let" Exp4 DeclSym Exp "in" Exp
+  | LamE "\\" Exp0List "->" Exp
+  | StoreE Exp4 "<-" Exp
+  | CaseE "case" Exp "of" "{" CaseAltList DefaultAlt "}"
+  | SwitchE "switch" Exp "of" "{" SwitchAltList DefaultAlt "}"
+  | BranchE "branch" "{" BranchAltList "|" Exp ";" "}"
+  | _ Exp4
+
+data Exp4
+  | BinOpE Exp3 usym Exp3
+  | _ Exp3
+
+data Exp3
+  | AppE Exp3 Exp2
+  | _ Exp2
+
+data Exp2
+  | UnOpE UnOp Exp1
+  | _ Exp1
+
+data Exp1
+  | IdxE Exp1 "[" Exp "]"
+  | FldE Exp1 "." Field
+  | _ Exp0
+
+data Exp0
+  | ArrayE "Array" "[" ExpList "]"
+  | RecordE "{" FieldDList "}"
+  | TupleE "(" ExpList ")"
+  | AscribeE "(" Exp "::" Type ")"
+  | CountE Count
+  | VarE Var
+  | LitE Lit
+
+}
+
+data UnOp | Load "@"
+
+data CaseAlt | CaseAlt Con VarList "->" Exp
+
+data SwitchAlt | SwitchAlt Lit "->" Exp
+
+data DefaultAlt
+  | DefaultAlt Var "->" Exp ";"
+  | DefaultNone
+
+data BranchAlt | BranchAlt Exp4 "->" Exp
+
+data Cxt | Cxt Con VarList
+
+group {
+
+data Type
+  | TyCxt "{" CxtList "}" "=>" Type3
+  | _ Type3
+
+data Type3
+  | TyFun Type2 "->" Type3
+  | _ Type2
+
+data Type2
+  | TyArray "Array" Type1 Type1
+  | TyConstr Con Type1List
+  | _ Type1
+
+data Type1
+  | _ Type0
+
+data Type0
+  | TyTuple "(" TypeList ")"
+  | TyCount Count
+  | TyVarT TyVar
+  | TyConstr0 Con
+
+}
+
+data TyDecl
+  | TyRecord "{" FieldTList "}"
+  | TyTagged "|" ConCList
+  | TySyn Type
+
+data ConC | ConC Con Type0List
+
+data FieldT | FieldT Field "::" Type
+
+data Lit
+  | CharL char
+  | StringL string
+  | NmbrL number
+  | EnumL Con
+
+data FieldD | FieldD Field "=" Exp
+
+data Count | Count "#" "" number
+
+data Var | Var lident
+
+data Con | Con uident
+
+data Modid | Modid uident
+
+data Field | Field lident
+
+data TyVar
+ | VarTV lident
+ | CntTV "#" lident
+
+list BranchAltList BranchAlt empty terminator ";" vert
+list CaseAltList CaseAlt empty terminator ";" vert
+list SwitchAltList SwitchAlt empty terminator ";" vert
+list TopDeclList TopDecl empty terminator ";" vert
+list ImportList Import nonempty terminator ";" vert
+list Exp5List Exp5 nonempty terminator ";" vert
+list ExportList Export nonempty terminator ";" vert
+list ConCList ConC nonempty separator "|" horiz
+list Exp0List Exp0 nonempty separator "" horiz
+list VarList Var empty separator "" horiz
+list ExpList Exp empty separator "," horiz
+list FieldDList FieldD nonempty separator "," horiz
+list FieldTList FieldT nonempty separator "," horiz
+list Type0List Type0 empty separator "" horiz
+list Type1List Type1 nonempty separator "" horiz
+list TypeList Type3 empty separator "," horiz
+list CxtList Cxt nonempty separator "," horiz

@@ -4,10 +4,10 @@ Q: How mature is pec?
 
 A: It's not :) Good ideas/help is appreciated in all areas, from
 language design, implementation, test cases, etc.  That being said,
-you should be able to use the pec compiler to write fairly
-sophisticated prototype applications (see examples in the test case
-directory).  Comments/questions/bug reports can be sent to brettletner
-at gmail dot com.
+you should be able to use the pec compiler to write prototype
+applications (see examples in the test case directory).
+Comments/questions/bug reports can be sent to brettletner at gmail dot
+com.
 
 Q:  Where did the name 'pec' come from?
 
@@ -42,13 +42,14 @@ language with the same target market seems like a fine thing, though.
 Q: Why no recursion?
 
 A: Recursion is generally (right or wrong) frowned upon in embedded
-development.  Also, not having recursion leaves open the possibility
-of compiling the whole program into a state machine.
+development.  Also, not having (general) recursion leaves open the
+possibility of compiling the whole program into a state machine.
 
 Q: Why no closures?
 
-A: Pec doesn't have a heap, so it can't have "upward"
-closures.  "Downward" closures may be added in the future.
+A: Pec doesn't have a heap, so it can't have "upward" closures.
+"Downward" closures may be added in the future.  It does have a simple
+form of macro lambda.
 
 Q: Why no objects?
 
@@ -78,5 +79,23 @@ foo = do
 A: The second assignment to p (i.e. p <- Nothing) should be disallowed
 while c is in scope.  The compiler currently doesn't prevent this (and
 other similar errors such as returning a pointer to the (soon to be
-invalidated) stack).  If anyone has an idea on how to prevent this I'd
-love to hear it.
+invalidated) stack).  If anyone has an idea on how to statically
+prevent this I'd love to hear it.
+
+Q: Why does the pec parser take so long to compile?
+
+A: I don't know.  Help on this from a 'happy' expert would be much
+appreciated.
+
+Q: How do I modify the pec grammar?
+
+A: You'll need my compiler construction tool, 'grm'.  Grm is similar
+to bnfc in that it will generate a parser, pretty printer, and AST
+from an input grammar file (e.g. pec.grm).  Grm can be found on
+hackage and git@github.com:stevezhee/grm.git.
+
+Q: At least one of the examples in the euler directory (Euler10.pec)
+takes a very long time (infinity?) to compile under LLVM.  Why?
+
+A: I don't know.  Help on this from a llvm/llc expert would be much
+appreciated.

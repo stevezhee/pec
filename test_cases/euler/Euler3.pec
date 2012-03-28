@@ -1,0 +1,34 @@
+module Euler3
+
+imports
+  Prelude
+  Data.Stack
+
+where
+
+// The prime factors of 13195 are 5, 7, 13 and 29.
+// What is the largest prime factor of the number 600851475143 ?
+
+main :: () -> I32
+main () = do
+  p = new (stack #20000)
+  assert (primes_and_fact 600851475143 p)
+  case new (pop p) of
+    Nothing -> assert False
+    Just x -> do
+      assert (@x == 6857)
+      putW @x
+  0
+
+primes_and_fact :: W64 -> Ptr (Stack #cnt W64) -> Bool
+primes_and_fact w p => do
+  h = sqrtw w
+  empty p
+  b = new (if (is_factor w 2) (push 2 p) True)
+  for 3 (\i -> @b && (i <= h)) (add 2)
+    (\i -> when ((is_factor w i) && (not (any (is_factor i) p)))
+      (b <- push i p))
+  @b
+
+is_factor :: { Arith a, Eq a } => a -> a -> Bool
+is_factor x y => (x % y) == 0

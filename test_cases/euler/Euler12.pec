@@ -1,0 +1,78 @@
+module Euler12
+
+imports
+  Prelude
+  Data.Stack
+
+where
+
+main :: () -> I32
+main () = do
+  t = new (28 :: W32)
+  for 8 (\_ -> my_factor @t <= 500) succ
+    (\i -> t += i)
+  assert (@t == 76576500)
+  putW @t
+  0
+
+my_factor :: W32 -> W32 // BAL: w must be non-zero
+my_factor w => do
+  j = sqrtw w
+  t = new 0
+  for 1 (\i -> i < j) succ
+    (\i -> when ((w % i) == 0) (t += 2))
+  when ((w % j) == 0)
+    (do
+      inc t
+      k = w / j
+      when (k != j) (inc t)
+    )
+  @t
+
+// main :: () -> I32
+// main () = do
+//   p = new (stack #500)
+//   assert (factor 25 p)
+//   put putW p
+//   assert (factor 100 p)
+//   put putW p
+//   // assert (factor 2 p)
+//   // put putW p
+//   // assert (factor 3 p)
+//   // put putW p
+//   // assert (factor 4 p)
+//   // put putW p
+//   // assert (factor 100 p)
+//   // put putW p
+//   // assert (factor 110 p)
+//   // put putW p
+//   i = new (1 :: W32)
+//   t = new (1 :: W32)
+//   while (factor @t p)
+//     (do
+//       inc i
+//       t += @i
+//     )
+//   putW @t
+//   putS "\n"
+//   0
+
+// factor :: W32 -> Ptr (Stack #cnt W32) -> Bool // BAL: w must be non-zero
+// factor w p => do
+//   i = new 1
+//   j = sqrtw w
+//   b = new True
+//   empty p
+//   while ((@i < j) && @b)
+//     (do
+//       when ((w % @i) == 0)
+//         (b <- (push @i p) && (push (w / @i) p))
+//       inc i
+//     )
+//   when ((w % j) == 0)
+//     (do
+//       b <- push j p
+//       k = w / j
+//       when (k != j) (b <- push k p)
+//     )
+//   @b

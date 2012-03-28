@@ -12,14 +12,19 @@ Feature list
   - No garbage collection
   - Strong typing with Hindley-Milner type inference
   - Safe pointers, no indexing out of bounds
-  - Variants, vectors, tuples, records, arbitrary sized integers
+  - Variants, arrays, tuples, records, arbitrary sized integers
   - User defined, polymorphic data structures
-  - Parametric polymorphism, ad-hoc polymorphism, laziness (strict by
-    default), user-defined operators, etc.
+  - Parametric polymorphism, limited ad-hoc polymorphism
   - Modules
-  - Compiles to LLVM (C planned)
+  - Compiles to C and LLVM
   - Haskell-ish syntax/layout
   - BSD license
+
+Building
+  - type 'make'
+  - resolve all hackage dependencies
+  - type 'make' again
+  - go and get a cup of coffee :)
 
 Pec (the language and the compiler) is in the alpha stage of
 development.  The compiler is implemented in Haskell and has a very
@@ -27,7 +32,7 @@ small codebase (thanks to several existing Haskell tools/libraries).
 
 You can download and install pec via cabal or access the git
 repository on github (git@github.com:stevezhee/pec.git).  You'll need
-to install the llvm tools (http://llvm.org/) to build the examples.
+to have a c compiler installed to build the examples.
 
 Any feedback on the design and/or implementation of pec would be
 greatly appreciated :)

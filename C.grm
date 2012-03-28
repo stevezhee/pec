@@ -1,0 +1,85 @@
+data Module
+  | HModule "#ifndef" uident "\n#define" uident "\n" ImportList DeclareList "\n#endif"
+  | CModule ImportList DefineList
+
+data Import
+  | Import "#include" string
+  | GImport "#include" "<" "" lident "" ">"
+
+data Declare
+  | Declare FunDecl
+  | Typedef "typedef" Decl
+
+data Define
+  | Define FunDecl "{" StmtList "}"
+
+data FunDecl
+  | FunFD Type lident "" "(" "" ArgDeclList "" ")"
+  | RetFunFD Type "(" "*" lident "(" "" ArgDeclList "" ")" ")" "(" "" TypeList "" ")"
+
+data Type
+  | TyName uident
+  | TyPtr Type "" "*"
+  | TyFun Type "(" "" "*" "" ")" "(" "" TypeList "" ")"
+  | TyArray Type "[" number "]"
+  | TyEnum "enum" "{" EnumCList "}"
+  | TyStruct "struct" "{" DeclList "}"
+  | TyUnion "union" "{" DeclList "}"
+
+data EnumC | EnumC uident
+
+data Decl
+  | Decl Type lident
+  | FunD Type lident "" "(" "" TypeList "" ")"
+
+data Exp
+  | AllocaE "alloca" "(" "sizeof" "(" Type ")" ")"
+  | VarE lident
+  | LitE Lit
+  | CastE "(" Type ")" Exp
+  | LoadE "*" "" Exp
+  | ArrowE Exp "" "->" "" Exp
+  | DotE Exp "" "." "" Exp
+  | AddrE "&" "" Exp
+  | IdxE Exp "" "[" "" Exp "" "]"
+  | CallE Exp "" "(" "" ExpList "" ")"
+  | BinOpE "(" "" Exp usym Exp "" ")"
+  | ParenE "(" Exp ")"
+  | NotE "!" "" Exp
+
+data Stmt
+  | DeclS Decl
+  | AssignS Exp "=" Exp
+  | CallS Exp "" "(" "" ExpList "" ")"
+  | SwitchS "switch" "(" Exp ")" "{" SwitchAltList "}"
+  | BreakS "break"
+  | IfS "if" "(" Exp ")" "{" StmtList "}" "else" "{" StmtList "}"
+  | WhenS "if" "(" Exp ")" "{" StmtList "}"
+  | WhileS "while" "(" Exp ")" "{" StmtList "}"
+  | ReturnS "return" "" "(" "" Exp "" ")"
+  | RetVoidS "return"
+  | NoOpS
+  | BlockS StmtList
+  | IncS Exp "" "++"
+  | DecS Exp "" "--"
+
+data SwitchAlt
+  | SwitchAlt "case" Lit "" ":" StmtList
+  | DefaultAlt "default:" StmtList
+
+data Lit
+  | StringL string
+  | CharL char
+  | NmbrL number
+  | EnumL uident
+
+list TypeList Type empty separator "," horiz
+list ExpList Exp nonempty separator "," horiz
+list EnumCList EnumC nonempty separator "," horiz
+list DeclList Decl empty terminator ";" horiz
+list ArgDeclList Decl empty separator "," horiz
+list SwitchAltList SwitchAlt empty terminator "" vert
+list StmtList Stmt empty terminator ";" vert
+list DeclareList Declare empty terminator ";" vert
+list DefineList Define empty terminator ";" vert
+list ImportList Import empty terminator "" vert

@@ -1,0 +1,68 @@
+data Module
+  | Module "module" uident ImportList DefineList
+
+data Import | Import "import" uident
+
+data Define
+  | Define "define" Type lident "(" TVarList ")" "=" "{" StmtList "}"
+
+data Stmt
+  | LetS TVar "=" Exp
+  | StoreS TVar ":=" Atom
+  | CallS "call" TVar "(" AtomList ")"
+  | SwitchS "switch" Atom "{" StmtList "}" "{" SwitchAltList "}"
+  | IfS "if" Atom "{" StmtList "}"  "{" StmtList "}"
+  | WhenS "when" Atom "{" StmtList "}"
+  | WhileS "while" "{" StmtList "}" Atom "{" StmtList "}"
+  | ReturnS "return" Atom
+  | NoOpS "noop"
+
+data Exp
+  | CallE TVar "(" AtomList ")"
+  | CastE "cast" TVar Type
+  | AllocaE "alloca" Type
+  | LoadE "load" "(" TVar ")"
+  | AtomE Atom
+
+data Atom
+  | LitA TLit
+  | VarA TVar
+
+data SwitchAlt | SwitchAlt TLit "->" "{" StmtList "}"
+
+data Lit
+  | StringL string
+  | NmbrL number
+  | CharL char
+  | EnumL uident
+  | VoidL
+
+data TyDecl
+  | TyEnum "enum" EnumCList
+  -- | TyArray "[" integer "]" Type
+  | TyRecord "record" "{" FieldTList "}"
+  | TyTagged "tagged" ConCList
+
+data TVar | TVar lident "::" Type
+
+data TLit | TLit Lit "::" Type
+
+data FieldT | FieldT uident "::" Type
+
+data ConC | ConC uident Type
+
+data Type | Type uident "(" TypeList ")"
+
+data EnumC | EnumC uident
+
+list ConCList ConC nonempty separator "|" horiz
+list FieldTList FieldT nonempty separator "," horiz
+list EnumCList EnumC nonempty separator "|" horiz
+list TypeList Type empty separator "," horiz
+list ExpList Exp nonempty separator "," horiz
+list AtomList Atom nonempty separator "," horiz
+list TVarList TVar nonempty separator "," horiz
+list SwitchAltList SwitchAlt empty terminator ";" vert
+list StmtList Stmt empty terminator ";" vert
+list DefineList Define empty terminator ";" vert
+list ImportList Import empty terminator ";" vert

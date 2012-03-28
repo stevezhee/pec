@@ -1,0 +1,167 @@
+module Data.Deque
+
+exports
+  Deque
+  any
+  del_back
+  deque
+  empty
+  filter
+  find
+  find_idx
+  fold
+  foreach
+  foreach_idx
+  is_empty
+  is_full
+  map
+  pop_back
+  pop_front
+  push_back
+  push_front
+  put
+
+imports
+  Prelude
+  Data.Array as A
+
+where
+
+type Deque cnt a =
+  { back :: Idx #cnt
+  , height :: W32
+  , data :: Array #cnt a
+  }
+
+filter :: (a -> Bool) -> Ptr (Deque #cnt a) -> ()
+filter f p => do
+  h = @p.height
+  empty p
+  unsafe_foreach_idx (back p) h (filter_elem f p)
+
+filter_elem :: (a -> Bool) -> Ptr (Deque #cnt a) -> Idx #cnt -> ()
+filter_elem f p i => do
+  a = @p.data[i]
+  when (f a) (assert (push_front a p))
+
+any :: { Load p } => (a -> Bool) -> Pointer p (Deque #cnt a) -> Bool
+any f p => case new (find_idx f p) of
+  Nothing -> False
+  Just _ -> True
+
+find :: { Load p } =>
+  (a -> Bool) -> Pointer p (Deque #cnt a) -> Maybe (Pointer p a)
+find f p => case new (find_idx f p) of
+  Nothing -> Nothing
+  Just i -> Just p.data[@i]
+
+find_idx :: { Load p } =>
+  (a -> Bool) -> Pointer p (Deque #cnt a) -> Maybe (Idx #cnt)
+find_idx f p => unsafe_find_idx (back p) @p.height f p.data
+
+unsafe_find_idx :: { Load p } =>
+  Idx #cnt -> W32 -> (a -> Bool) -> Pointer p (Array #cnt a) ->
+  Maybe (Idx #cnt)
+unsafe_find_idx b j f p => do
+  i = new (0 :: W32)
+  while ((@i < j) && (not (f @p[wrap_add b @i]))) (inc i)
+  branch
+    @i == j -> Nothing
+    | Just (unsafe_to_idx @i)
+
+map :: (a -> b) -> Ptr (Deque #cnt a) -> Deque #cnt b
+map f p => do
+  q = unsafe_alloca
+  foreach_idx (A.map_idx f p.data q.data) p
+  q.height <- @p.height
+  q.back <- @p.back
+  load q
+
+foreach :: { Load p } =>
+  (Pointer p a -> ()) -> Pointer p (Deque #cnt a) -> ()
+foreach f p => foreach_idx (A.apply_at_idx f p.data) p
+
+foreach_idx :: { Load p } =>
+  (Idx #cnt -> ()) -> Pointer p (Deque #cnt a) -> ()
+foreach_idx f p => unsafe_foreach_idx (back p) @p.height f
+
+unsafe_foreach_idx :: Idx #cnt -> W32 -> (Idx #cnt -> ()) -> ()
+unsafe_foreach_idx b h f => times h (\i -> f (wrap_add b i))
+
+deque :: #cnt -> Deque #cnt a
+deque _ => do
+  p = unsafe_alloca
+  p.back <- 0
+  empty p
+  load p
+
+empty :: Ptr (Deque #cnt a) -> ()
+empty p => p.height <- 0
+
+push_front :: a -> Ptr (Deque #cnt a) -> Bool
+push_front a p => branch
+  is_full p -> False
+  | do
+      p.data[front p] <- a
+      inc p.height
+      True
+
+pop_front :: Ptr (Deque #cnt a) -> Maybe a
+pop_front p => branch
+  is_empty p -> Nothing
+  | do
+      dec p.height
+      Just @p.data[front p]
+
+push_back :: a -> Ptr (Deque #cnt a) -> Bool
+push_back a p => branch
+  is_full p -> False
+  | do
+      p.data[@p.back] <- a
+      p.back <- wrap_dec @p.back
+      inc p.height
+      True
+
+pop_back :: Ptr (Deque #cnt a) -> Maybe a
+pop_back p => branch
+  del_back p -> Just @p.data[@p.back]
+  | Nothing
+
+del_back :: Ptr (Deque #cnt a) -> Bool
+del_back p => branch
+  is_empty p -> False
+  | do
+      p.back <- wrap_add @p.back 1
+      dec p.height
+      True
+
+is_empty :: { Load p } => Pointer p (Deque #cnt a) -> Bool
+is_empty p => @p.height == 0
+
+is_full :: { Load p } => Pointer p (Deque #cnt a) -> Bool
+is_full p => @p.height == count p.data
+
+front :: { Load p } => Pointer p (Deque #cnt a) -> Idx #cnt
+front p => wrap_add (back p) @p.height
+
+back :: { Load p } => Pointer p (Deque #cnt a) -> Idx #cnt
+back p => wrap_add @p.back 1
+
+wrap_op :: (W32 -> W32) -> Idx #cnt -> Idx #cnt
+wrap_op f a => unsafe_to_idx ((f (from_idx a)) % (count_idx a))
+
+wrap_add :: Idx #cnt -> W32 -> Idx #cnt
+wrap_add a b => wrap_op (add b) a
+
+wrap_dec :: Idx #cnt -> Idx #cnt
+wrap_dec a => wrap_add a (count_idx a - 1)
+
+put :: { Load p } =>
+  (a -> ()) -> Pointer p (Deque #cnt a) -> ()
+put f p => putBrackets (foreach (putElem f) p)
+
+fold :: { Load p } => (b -> a -> b) -> b -> Pointer p (Deque #cnt a) -> b
+fold f b deq => do
+  pb = new b
+  foreach (fold_ptr f pb) deq
+  @pb

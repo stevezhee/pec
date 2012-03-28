@@ -1,6 +1,6 @@
 Name: pec
 
-Version: 0.1.1
+Version: 0.2.0
 
 Synopsis: pec embedded compiler
 
@@ -14,33 +14,35 @@ Author: Brett Letner <brettletner@gmail.com>
 
 Maintainer: Brett Letner <brettletner@gmail.com>
 
-Copyright: Brett letner 2011
+Copyright: Brett Letner 2011-2012
 
 Category: Language
 
 Build-type: Simple
 
-Extra-source-files: Pec.cf
+data-files: Makefile, FAQ, DESIGN, lib/Data/Array.pec, lib/Data/Stack.pec, lib/Data/Deque.pec, lib/Data/Queue.pec, lib/Data/StrBuf.pec, lib/Prelude.pec, test_cases/TestStack.pec, test_cases/TestLoad.pec, test_cases/TestPrims.pec, test_cases/TestTuple.pec, test_cases/TestStrBuf.pec, test_cases/TestVariant.pec, test_cases/TestArray.pec, pec.cabal, THANKS, README, TODO, CHANGES, Pec.grm, Pir.grm, Pds.grm, C.grm, LLVM.grm, MkPec.hs
 
-data-files: Makefile, FAQ, Pec/Makefile, DESIGN, lib/Stack.pec, lib/StrBuf.pec, lib/Prelude.pec, test_cases/Makefile, test_cases/TestStack.pec, test_cases/TestLoad.pec, test_cases/TestPrims.pec, test_cases/TestTuple.pec, test_cases/TestStrBuf.pec, test_cases/TestVariant.pec, test_cases/TestArray.pec, pec.cabal, THANKS, README, TODO, LICENSE, Language/Pec/Doc.html
-
-Cabal-version: >= 1.6
+Cabal-version: >= 1.8
 
 source-repository head
   type: git
   location: git://github.com/stevezhee/pec.git
 
 Library
-  Exposed-modules: Pec.Base
-  Build-depends: base
---  GHC-Options: -fhpc
+  Exposed-modules: Pec.Base, Pec.C, Pec.LLVM, Pec.PUtil, Pec.HUtil, Pec.IUtil, Pec.Desugar, Language.Pec.Abs, Language.Pec.Par, Language.Pir.Abs, Language.C.Abs, Language.LLVM.Abs, Language.Pds.Abs, Paths_pec
+  Build-depends: base, mtl, grm, Cabal, uniplate, derive, wl-pprint, syb, deepseq, array, containers, shake, cmdargs
+
+Executable pecgen
+  Main-is: PecGen.hs
+  Build-depends: pec, base, derive, wl-pprint, filepath, cmdargs, grm, Cabal, syb, deepseq, uniplate, mtl, directory
+  Hs-Source-Dirs: src
 
 Executable pec
-  Main-is: Main.hs
-  
-  Build-depends: base >= 4 && < 5, derive, array, filepath, cmdargs, mtl, process, directory, Cabal
-  
-  Other-modules: Language.Pec.Lex, Language.Pec.Layout, Language.Pec.ErrM, Language.Pec.Abs, Language.Pec.Par, Language.Pec.Print
+  Main-is: Pec.hs
+  Build-depends: pec, base, old-time, process, filepath, directory, cmdargs, grm, Cabal, wl-pprint, syb, deepseq, uniplate, mtl, shake
+  Hs-Source-Dirs: src
 
---   Build-tools: happy, alex
-  -- GHC-Options: -fhpc
+Executable pecgencnt
+  Main-is: PecGenCnt.hs
+  Build-depends: pec, base, derive, cmdargs, grm, Cabal, wl-pprint, syb, deepseq, uniplate, mtl, filepath
+  Hs-Source-Dirs: src

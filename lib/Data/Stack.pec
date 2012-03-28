@@ -1,0 +1,119 @@
+module Data.Stack
+
+// explicit export list
+
+exports
+  Stack
+  any
+  empty
+  filter
+  find
+  find_idx
+  fold
+  foreach
+  foreach_idx
+  is_empty
+  is_full
+  map
+  pop
+  push
+  put
+  stack
+
+imports
+  Prelude
+  Data.Array as A
+
+where
+
+// BAL: some Ptr's can be changed to Load Pointers
+
+type Stack cnt a =
+  { height :: W32
+  , data :: Array #cnt a
+  }
+// stacks are polymorphic in their size and what they contain
+
+filter :: (a -> Bool) -> Ptr (Stack #cnt a) -> ()
+filter f p => do
+  h = @p.height
+  empty p
+  A.unsafe_foreach_idx h (filter_elem f p)
+
+filter_elem :: (a -> Bool) -> Ptr (Stack #cnt a) -> Idx #cnt -> ()
+filter_elem f p i => do
+  a = @p.data[i]
+  when (f a) (assert (push a p))
+
+find :: (a -> Bool) -> Ptr (Stack #cnt a) -> Maybe (Ptr a)
+find f p => case new (find_idx f p) of
+  Nothing -> Nothing
+  Just i -> Just p.data[@i]
+
+find_idx :: (a -> Bool) -> Ptr (Stack #cnt a) -> Maybe (Idx #cnt)
+find_idx f p => A.unsafe_find_idx @p.height f p.data
+
+any :: (a -> Bool) -> Ptr (Stack #cnt a) -> Bool
+any f p => case new (find_idx f p) of
+  Nothing -> False
+  Just _ -> True
+
+fold :: { Load p } => (b -> a -> b) -> b -> Pointer p (Stack #cnt a) -> b
+fold f b stck => do
+  pb = new b
+  foreach (fold_ptr f pb) stck
+  @pb
+
+map :: (a -> b) -> Ptr (Stack #cnt a) -> Stack #cnt b
+map f p => do
+  q = unsafe_alloca
+  foreach_idx (A.map_idx f p.data q.data) p
+  q.height <- @p.height
+  load q
+
+foreach_idx :: { Load p } =>
+  (Idx #cnt -> ()) -> Pointer p (Stack #cnt a) -> ()
+foreach_idx f p => A.unsafe_foreach_idx @p.height f
+
+foreach :: { Load p } =>
+  (Pointer p a -> ()) -> Pointer p (Stack #cnt a) -> ()
+foreach f p => foreach_idx (A.apply_at_idx f p.data) p
+
+stack :: #cnt -> Stack #cnt a
+stack _ => do
+  p = unsafe_alloca
+  empty p
+  load p
+
+push :: a -> Ptr (Stack #cnt a) -> Bool
+push a p => branch
+  is_full p -> False
+  | do
+      p.data[unsafe_to_idx @p.height] <- a
+      inc p.height
+      True
+
+pop :: Ptr (Stack #cnt a) -> Maybe a
+pop p => branch
+  del p -> Just @p.data[unsafe_to_idx @p.height]
+  | Nothing
+
+del :: Ptr (Stack #cnt a) -> Bool
+del p => branch
+  is_empty p -> False
+  | do
+      dec p.height
+      True
+
+is_empty :: { Load p } => Pointer p (Stack #cnt a) -> Bool
+is_empty p => @p.height == 0
+
+is_full :: { Load p } => Pointer p (Stack #cnt a) -> Bool
+is_full p => @p.height > unsafe_cast (A.max_idx p.data)
+
+empty :: Ptr (Stack #cnt a) -> ()
+empty p => p.height <- 0
+
+put :: { Load p } =>
+  (a -> ()) -> Pointer p (Stack #cnt a) -> ()
+put f p => putBrackets (foreach (putElem f) p)

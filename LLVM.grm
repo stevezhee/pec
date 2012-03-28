@@ -1,0 +1,131 @@
+data Module
+  | Module DefineList
+
+data Define
+  | Define "define" Type lident "(" TVarList ")" "{" StmtList "}"
+  | Declare "declare" Type lident "(" TypeList ")"
+  | TypeD lident "=" "type" Type
+  | StringD lident "= private constant [" number "x i8 ] c" "" "\"" "" lident "" "\\00\""
+
+data Stmt
+  | LetS lident "=" Exp
+  | StoreS "store" Atom "" "," TVar
+  | CallS "call" TVar "(" AtomList ")"
+  | SwitchS "switch" Atom "" ", label %" "" lident "[" SwitchAltList "]"
+  | ReturnS "ret" Atom
+  | LabelS lident "" ":"
+  | BrS "br i1" UAtom "" ", label %" "" lident "" ", label %" "" lident
+  | Br0S "br label %" "" lident
+  | TagS "store" Atom "" "," 
+  | NoOpS ";"
+
+data Exp
+  | CallE "call" TVar "(" AtomList ")"
+  | CastE Cast TVar "to" Type
+  | AllocaE "alloca" Type
+  | LoadE "load" TVar
+  | AtomE Atom
+  | BinOpE BinOp Type UAtom "" "," UAtom
+  | IdxE "getelementptr inbounds" TVar "" ", i32 0," Atom
+
+data Cast
+  | Bitcast "bitcast"
+  | Sitofp "sitofp"
+  | Uitofp "uitofp"
+  | Fptosi "fptosi"
+  | Fptoui "fptoui"
+  | Trunc "trunc"
+  | Zext "zext"
+  | Sext "sext"
+  | Fptrunc "fptrunc"
+  | Fpext "fpext"
+
+data BinOp
+  | Icmp "icmp" ICond
+  | Fcmp "fcmp" FCond
+  | Add "add nuw nsw"
+  | Fadd "fadd"
+  | Sub "sub nuw nsw"
+  | Fsub "fsub"
+  | Mul "mul nuw nsw"
+  | Fmul "fmul"
+  | Udiv "udiv"
+  | Sdiv "sdiv"
+  | Fdiv "fdiv"
+  | Urem "urem"
+  | Srem "srem"
+  | Frem "frem"
+  | Shl "shl"
+  | Lshr "lshr"
+  -- | Ashr "ashr"
+  | And "and"
+  | Or "or"
+  | Xor "xor"
+
+data Atom
+  | LitA TLit
+  | VarA TVar
+
+data UAtom
+  | LitUA Lit
+  | VarUA lident
+
+data ICond
+  | Equ "eq"
+  | Neq "ne"
+  | Ugt "ugt"
+  | Sgt "sgt"
+  | Uge "uge"
+  | Sge "sge"
+  | Ult "ult"
+  | Slt "slt"
+  | Ule "ule"
+  | Sle "sle"
+
+data FCond
+  | Ogt "ogt"
+  | Oge "oge"
+  | Olt "olt"
+  | Ole "ole"
+  -- | Oeq "oeq"
+  -- | One "one"
+
+data SwitchAlt | SwitchAlt TLit "" ", label %" "" lident
+
+data Lit
+  | NmbrL number
+  | FalseL "false"
+  | TrueL "true"
+  | StringL "getelementptr inbounds ([" number "x i8 ]*" lident "" ", i32 0, i32 0)"
+  | VoidL
+
+data TVar | TVar Type lident
+
+data TLit | TLit Type Lit
+
+data FieldT | FieldT uident "::" Type
+
+data ConC | ConC uident Type
+
+data Type
+  | PtrT Type "" "*"
+  | IntT "i" "" number
+  | FloatT "float"
+  | DoubleT "double"
+  | VoidT "void"
+  | FunT Type "(" TypeList ")"
+  | VarArgsT "..."
+  | UserT lident
+  | StructT "{" TypeList "}"
+  | ArrayT "[" number "x" Type "]"
+  | CharT "i8"
+
+list ConCList ConC nonempty separator "|" horiz
+list FieldTList FieldT nonempty separator "," horiz
+list TypeList Type empty separator "," horiz
+list ExpList Exp nonempty separator "," horiz
+list AtomList Atom nonempty separator "," horiz
+list TVarList TVar nonempty separator "," horiz
+list SwitchAltList SwitchAlt empty terminator "" vert
+list StmtList Stmt empty terminator "" vert
+list DefineList Define empty terminator "" vert

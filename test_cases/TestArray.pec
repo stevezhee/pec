@@ -1,35 +1,53 @@
-module TestArray exports all
+module TestArray
+
+imports
+  Prelude
+  Data.Array
 
 where
 
-import Prelude
-
 // fixed sized arrays
 
-garr = Array [ 'a', 'b', 'c' ]
+garr => Array [ 'a', 'b', 'c' ]
 
-main :: () -> W32
+main :: () -> I32
 main () = do
+  putLn "testArray"
   testSingleDim ()
   testMultiDim ()
+  testOps ()
   0
 
 testSingleDim () = do
   putLn "testSingleDim"
-  arr = new Array [ 'x', 'y', 'z' ]
+  arrval = Array [ 'x', 'y', 'z' ]
+  arr = new (arrval :: Array #3 Char)
+  put putCh arr
   assert (@arr[0] == 'x')
   putCh @arr[0] // index operator.  returns pointer to given index
   putCh @arr[1]
   putCh @arr[2]
-// the index operator is type safe, i.e. putCh @arr[3] will fail to compile.
+  alsoarr = new arrval
+  put putCh alsoarr
+  assert (@alsoarr[0] == 'x')
+  assert (@alsoarr[1] == 'y')
+  assert (@alsoarr[2] == 'z')
+  // the index operator is type safe, i.e. putCh @arr[3] will fail to compile.
   arr[0] <- 'a' // store an 'a' at element 0
   arr[1] <- 'b'
   arr[2] <- 'c'
+  put putCh arr
   putCh @arr[0]
   putCh @arr[1]
   putCh @arr[2]
   assert (@arr[0] == 'a')
+  assert (@arr[1] == 'b')
+  assert (@arr[2] == 'c')
+  assert (@alsoarr[0] == 'x')
+  assert (@alsoarr[1] == 'y')
+  assert (@alsoarr[2] == 'z')
   arr <- Array [ 'x', 'y', 'z' ]
+  put putCh arr
   putCh @arr[0]
   putCh @arr[1]
   putCh @arr[2]
@@ -39,6 +57,10 @@ testSingleDim () = do
   assert (@arr2[4] == 'c')
   putCh @arr2[0]
   putCh @arr2[4]
+  arr3 = new (array #2 True)
+  arr3[1] <- False
+  arrayf arr3
+  arrayf2 arr3
   putLn "done"
 
 arrayf :: Ptr (Array #2 Bool) -> ()
@@ -46,11 +68,16 @@ arrayf arr = do
   assert @arr[0]
   assert (not @arr[1])
 
+arrayf2 :: Ptr (Array #2 Bool) -> ()
+arrayf2 p = arrayf p
+
 testMultiDim () = do
   putLn "testMultiDim"
-  arr = new Array [ Array [ 'a', 'b' ]
-                  , Array [ 'c', 'd' ]
-                  , Array [ 'e', 'f' ] ]
+  arr = new Array
+            [ Array [ 'a', 'b' ]
+            , Array [ 'c', 'd' ]
+            , Array [ 'e', 'f' ]
+            ]
   putCh @arr[0][0]
   putCh @arr[0][1]
   putCh @arr[1][0]
@@ -66,4 +93,47 @@ testMultiDim () = do
   assert @x[0][0][0]
   assert (not @x[1][0][0])
   () = arrayf (new (Array [ True, False ]))
+  (p :: Ptr (Array #1 (Array #1 Bool))) = x[0]
+  assert @p[0][0]
+  (q :: Ptr (Array #1 Bool)) = x[0][0]
+  assert @q[0]
+  (r :: Ptr (Array #1 Bool)) = p[0]
+  assert @r[0]
   (putLn "done" :: ())
+
+sum => fold add 0
+
+testOps :: () -> ()
+testOps () = do
+  putLn "testOps"
+  arr = new (Array [ (1 :: W32), 2, 3])
+  t = new (sum arr)
+  assert (@t == 6)
+
+  foreach inc arr
+  t <- sum arr
+  assert (@t == 9)
+
+  mi = new (find_idx (eq 0) arr)
+  case mi of
+    Nothing -> assert True
+    Just _ -> assert False
+
+  mi <- find_idx (eq 4) arr
+  case mi of
+    Nothing -> assert False
+    Just i -> assert (@i == 2)
+
+/*
+// There is no good reason that the following shouldn't work.  It's just a pain to generate the required C code.
+retArray :: () -> Array #2 Char
+retArray () = Array [ 'p', 'q' ]
+
+argArray :: Array #2 Char -> Bool
+argArray arr = do
+  p = new arr
+  @p[1] == 'q'
+
+ptrArray :: Ptr (Array #2 Bool) -> Ptr (Array #2 Bool)
+ptrArray a = a
+*/

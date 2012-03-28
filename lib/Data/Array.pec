@@ -1,0 +1,90 @@
+module Data.Array
+
+exports
+  Data.Array.max_idx
+  apply_at_idx
+  array
+  find
+  find_idx
+  fold
+  foreach
+  foreach_idx
+  map
+  map_idx
+  unsafe_find_idx
+  unsafe_foreach_idx
+  put
+  any
+
+imports
+  Prelude
+
+where
+
+// BAL: change Ptr to Load Pointer where applicable
+
+map :: (a -> b) -> Ptr (Array #cnt a) -> Array #cnt b
+map f p => do
+  q = unsafe_alloca
+  foreach_idx (map_idx f p q) p
+  load q
+
+map_idx ::
+  (a -> b) -> Ptr (Array #cnt a) -> Ptr (Array #cnt b) -> Idx #cnt -> ()
+map_idx f p q i => q[i] <- f @p[i]
+
+apply_at_idx :: { Load p } =>
+  (Pointer p a -> ()) -> Pointer p (Array #cnt a) -> Idx #cnt -> ()
+apply_at_idx f p i => f p[i]
+
+find :: (a -> Bool) -> Ptr (Array #cnt a) -> Maybe (Ptr a)
+find f p => case new (find_idx f p) of
+  Nothing -> Nothing
+  Just i -> Just p[@i]
+
+any :: (a -> Bool) -> Ptr (Array #cnt a) -> Bool
+any f p => case new (find_idx f p) of
+  Nothing -> False
+  Just _ -> True
+
+find_idx :: (a -> Bool) -> Ptr (Array #cnt a) -> Maybe (Idx #cnt)
+find_idx f p => unsafe_find_idx (count p) f p
+
+unsafe_find_idx ::
+  W32 -> (a -> Bool) -> Ptr (Array #cnt a) -> Maybe (Idx #cnt)
+unsafe_find_idx j f p => do
+  i = new (0 :: W32)
+  while ((@i < j) && (not (f @p[unsafe_to_idx @i]))) (inc i)
+  branch
+    @i == j -> Nothing
+    | Just (unsafe_to_idx @i)
+
+fold :: { Load p } => (b -> a -> b) -> b -> Pointer p (Array #cnt a) -> b
+fold f b arr => do
+  pb = new b
+  foreach (fold_ptr f pb) arr
+  @pb
+
+array :: #cnt -> a -> Array #cnt a // BAL: leave the unused count param?
+array _ a => do
+  arr = unsafe_alloca
+  foreach (flip store a) arr
+  @arr
+
+foreach :: { Load p } =>
+  (Pointer p a -> ()) -> Pointer p (Array #cnt a) -> ()
+foreach f p => foreach_idx (apply_at_idx f p) p
+
+foreach_idx :: { Load p } =>
+  (Idx #cnt -> ()) -> Pointer p (Array #cnt a) -> ()
+foreach_idx f p => unsafe_foreach_idx (count p) f
+
+unsafe_foreach_idx :: W32 -> (Idx #cnt -> ()) -> ()
+unsafe_foreach_idx j f => times j (\i -> f (unsafe_to_idx i))
+
+max_idx :: Pointer p (Array #cnt a) -> Idx #cnt
+max_idx _ => idx_max
+
+put :: { Load p } =>
+  (a -> ()) -> Pointer p (Array #cnt a) -> ()
+put f p => putBrackets (foreach (putElem f) p)

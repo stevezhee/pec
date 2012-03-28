@@ -1,0 +1,38 @@
+module Euler10
+
+// The sum of the primes below 10 is 2 + 3 + 5 + 7 = 17.
+// Find the sum of all the primes below two million.
+
+imports
+  Prelude
+  Data.Stack
+
+where
+
+main :: () -> I32
+main () = do
+  p = new (stack #200000)
+  assert (primes 2000000 p)
+//  put putW p
+  t = sum p
+// BAL: printing of W64 is broken  putW t
+  assert (t == 142913828922)
+  0
+
+sum :: Ptr (Stack #cnt W32) -> W64
+sum => fold my_add 0
+
+my_add :: W64 -> W32 -> W64
+my_add x y => x + unsafe_cast y // BAL: casting from W32 to W64 isn't unsafe
+
+primes :: W32 -> Ptr (Stack #cnt W32) -> Bool
+primes w p => do
+  empty p
+  b = new (push 2 p)
+  for 3 (\i -> @b && (i < w)) (add 2)
+    (\i -> when (not (any (is_factor i) p)) (b <- push i p))
+  @b
+
+is_factor :: { Arith a, Eq a } => a -> a -> Bool
+is_factor x y => (x % y) == 0
+

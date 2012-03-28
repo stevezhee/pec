@@ -1,0 +1,28 @@
+module Euler7
+
+imports
+  Prelude
+  Data.Stack
+
+where
+
+main :: () -> I32
+main () = do
+  p = new (stack #10001)
+  primes p
+  case new (pop p) of
+    Nothing -> assert False
+    Just i -> do
+      assert (@i == 104743)
+      putW @i
+  0
+
+primes :: Ptr (Stack #cnt W32) -> ()
+primes p => do
+  empty p
+  b = new (push 2 p)
+  for 3 (\_ -> not (is_full p)) (add 2)
+    (\i -> when (not (any (is_factor i) p)) (b <- push i p))
+
+is_factor :: { Arith a, Eq a } => a -> a -> Bool
+is_factor x y => (x % y) == 0

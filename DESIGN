@@ -9,18 +9,17 @@ Haskell
   - Variants, tuples, records
   - case expressions, pattern matching
   - User defined, polymorphic data structures
-  - Parametric polymorphism, ad-hoc polymorphism, laziness,
-    user-defined operators, etc. (provided via Haskell DSL)
+  - Parametric polymorphism, limited ad-hoc polymorphism
   - Modules
   - Syntax/Layout
   - productive
 
 LLVM & C
-  - compiles to LLVM (C planned)
+  - compiles to C & LLVM
   - easy integration
   - efficient
   - simple run-time system
-  - arbitrary sized integers
+  - arbitrary sized integers (LLVM)
   - single static assignment (SSA) names
   - no garbage collection
   - no closures
@@ -33,41 +32,14 @@ Pec
   - no recursion
   - no operator precedence
 
-LANGUAGE ARCHITECTURE
-
-pec is made up of two sub-languages, the pec "application" language and
-the pec "library" DSL.  In this sense it is very similar to the
-relationship between C and the C pre-processor (although the "library"
-DSL should provide a dramatically better user experience than cpp).
-The intent is that the majority of code will be written in the
-"application" language by application programmers.  "Library" code
-(code that needs parametric polymorphism and other advanced features)
-will be written by library programmers that know both pec and Haskell
-and understand the provided DSL.  In fact, the goal is to offload as
-much as possible from the pec compiler to the libraries (e.g. type
-bool is implemented in a library).  These two types of code can be
-interspersed in a single .pec file.
-
-Syntax for the "application" language is contained in the pec.cf file.
-This file used by bnfc to automatically derive a lexer and a parser
-for the language.  The precise syntax for the "application" language
-can be found in Language/Pec/Doc.html.
-
-Syntax for the "library" language is simply Haskell
-syntax prefixed by a '>' at the start of a line.
-
-Check out the .pec files in the test directory to get a better feel
-for how pec works.
-
 COMPILER ARCHITECTURE
 
 The pec compiler leverages several tools in its compilation pipeline.
 This allows the compiler to be small and nimble (but can also have
 drawbacks, e.g. error messages).
 
-Main.hs implements the compiler pipeline.  Pec/Base.hs is the code
-generation library used by the generated Haskell modules.  It also
-provides the pec "library" DSL.
+src/Pec.hs implements the compiler pipeline.  Pec/Base.hs is the code
+generation library used by the generated Haskell modules.
 
 Pec compilation begins by specifying the "main" pec module on the
 command line.
@@ -92,12 +64,8 @@ executable.
   e.g. ghc --make Foo_main.hs
 
 When run, the resulting executable will create corresponding LLVM IR
-modules.
+modules or C modules.
 
   e.g.  Foo.ll, Bar.ll, Baz.ll
 
-LLVM is then used to transform the LLVM IR into LLVM bitcode and from
-there to the desired executable.
-
-The pec compiler doesn't currently generate C, but that is high on the
-TODO list.
+LLVM/gcc are then used to transform the code into the desired executable.

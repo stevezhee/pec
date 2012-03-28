@@ -1,0 +1,35 @@
+module Euler4
+
+imports
+  Prelude
+
+where
+
+// A palindromic number reads the same both ways. The largest palindrome made from the product of two 2-digit numbers is 9009 = 91 × 99.
+// Find the largest palindrome made from the product of two 3-digit numbers.
+
+main :: () -> I32
+main () = do
+  m = new (0 :: W32)
+  times 1000
+    (\i -> do
+      times 1000
+        (\j -> do
+          x = i * j
+          when (is_palindrome x)
+            (do
+              m <- max @m x
+            )
+        )
+    )
+  assert (@m == 906609)
+  putW @m
+  0
+
+is_palindrome x => rev_digits x == x
+
+rev_digits n => do
+  y = new 0
+  for n (\x -> x > 0) (\x -> x / 10)
+    (\x -> y <- (@y * 10) + (x % 10))
+  @y

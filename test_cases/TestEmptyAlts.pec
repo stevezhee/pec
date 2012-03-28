@@ -1,0 +1,16 @@
+module TestEmptyAlts
+
+imports
+  Prelude
+
+where
+
+main :: () -> I32
+main () = do
+  switch 'c' of // should work
+    _ -> assert True
+
+  // case 'c' of // should fail
+  //   _ -> assert True
+
+  0
