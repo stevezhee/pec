@@ -60,17 +60,9 @@ gen_files =
     , "Language/Pec/Par.hs"
     , "Language/Pec/Par.y"
     , "Language/Pds/Abs.hs"
-    , "Language/Pds/Par.hs"
-    , "Language/Pds/Par.y"
     , "Language/Pir/Abs.hs"
-    , "Language/Pir/Par.hs"
-    , "Language/Pir/Par.y"
     , "Language/C/Abs.hs"
-    , "Language/C/Par.hs"
-    , "Language/C/Par.y"
     , "Language/LLVM/Abs.hs"
-    , "Language/LLVM/Par.hs"
-    , "Language/LLVM/Par.y"
     ]
 
 clean :: IO ()
