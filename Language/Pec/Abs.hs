@@ -54,8 +54,8 @@ data ExtNm a
   deriving (Show,Eq,Ord,Data,Typeable)
 data Exp a
   = BlockE a (Exp5List a)
-  | LetS a (Exp4 a) (DeclSym a) (Exp a)
-  | LetE a (Exp4 a) (DeclSym a) (Exp a) (Exp a)
+  | LetS a (Exp0 a) (DeclSym a) (Exp a)
+  | LetE a (Exp0 a) (DeclSym a) (Exp a) (Exp a)
   | LamE a (Exp0List a) (Exp a)
   | StoreE a (Exp4 a) (Exp a)
   | CaseE a (Exp a) (CaseAltList a) (DefaultAlt a)
@@ -378,8 +378,8 @@ instance Pretty (Exp a) where
   pretty = ppExp
 ppExp x = case x of
   BlockE _ v1 -> text "do" <+> text "{" <+> ppExp5List v1 <+> text "}"
-  LetS _ v1 v2 v3 -> ppExp4 v1 <+> ppDeclSym v2 <+> ppExp v3
-  LetE _ v1 v2 v3 v4 -> text "let" <+> ppExp4 v1 <+> ppDeclSym v2 <+> ppExp v3 <+> text "in" <+> ppExp v4
+  LetS _ v1 v2 v3 -> ppExp0 v1 <+> ppDeclSym v2 <+> ppExp v3
+  LetE _ v1 v2 v3 v4 -> text "let" <+> ppExp0 v1 <+> ppDeclSym v2 <+> ppExp v3 <+> text "in" <+> ppExp v4
   LamE _ v1 v2 -> text "\\" <+> ppExp0List v1 <+> text "->" <+> ppExp v2
   StoreE _ v1 v2 -> ppExp4 v1 <+> text "<-" <+> ppExp v2
   CaseE _ v1 v2 v3 -> text "case" <+> ppExp v1 <+> text "of" <+> text "{" <+> ppCaseAltList v2 <+> ppDefaultAlt v3 <+> text "}"

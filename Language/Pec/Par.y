@@ -136,10 +136,10 @@ Exp
                                            ,point $4])   $3 }
   | Exp5 { $1 }
 Exp5
-  : Exp4 DeclSym Exp {LetS (lrPoint [point $1
+  : Exp0 DeclSym Exp {LetS (lrPoint [point $1
                                     ,point $2
                                     ,point $3]) $1 $2 $3}
-  | "let" Exp4 DeclSym Exp "in" Exp {LetE (lrPoint [point $1
+  | "let" Exp0 DeclSym Exp "in" Exp {LetE (lrPoint [point $1
                                                    ,point $2
                                                    ,point $3
                                                    ,point $4

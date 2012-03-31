@@ -8,6 +8,7 @@ module Pec.Desugar (desugar) where
 import Data.Char
 import Data.Either
 import Data.Generics.Uniplate.Data
+import Data.Data
 import Data.List
 import Data.Maybe
 import Grm.Prims
@@ -20,7 +21,7 @@ desugar :: Module Point -> D.Module
 desugar = rewriteBi dTyCxt . dModule . tModule
 
 tModule :: Module Point -> Module Point
-tModule m@(Module _ n _ _ _) =
+tModule m =
   rewriteBi dBlockE $ -- BAL: make it so we don't have to call these twice
   rewriteBi dConstructedE $
   rewriteBi dTupleE $
@@ -28,22 +29,50 @@ tModule m@(Module _ n _ _ _) =
   rewriteBi dBlockE $
   rewriteBi dConstructedE $
   rewriteBi unProcD $
-  transformBi (sortBy cmpFieldD) $ 
-  transformBi (sortBy cmpFieldT) $ 
-  transformBi (sortBy cmpConC) $ 
-  transformBi (\(Con p s) -> Con (p :: Point) $ userF s) $
-  transformBi (\(Field p s) -> Field (p :: Point) $ userF s) $
-  transformBi (\(Var p s) -> Var (p :: Point) $ userF s) m
+  transformBi (sortBy cmpFieldD) $
+  transformBi (sortBy cmpFieldT) $
+  transformBi (sortBy cmpConC) $
+  rename_m m
+
+rename_m :: Module Point -> Module Point
+rename_m m@(Module p n e i ds) = Module p n (f [] e) (f [] i) [ f (bound_vars d) d | d <- ds ]
   where
-    asTbl = [ (dModid b, dModid a ) | Import _ a (AsAS _ b) <- universeBi m ]
-    userF = usern asTbl (dModid n) myDefs
-    myDefs =
-      -- [ ppShow (a :: Var Point) | ExternD _ _ a _ <- universeBi m ] ++
+    f :: Data a => [String] -> a -> a
+    f = rename n [ (dModid b, dModid a ) | Import _ a (AsAS _ b) <- universeBi m ] $
       [ ppShow (a :: Con Point) | TypeD _ a _ _ <- universeBi m ] ++
       [ ppShow (a :: Con Point) | TypeD0 _ a _ <- universeBi m ] ++
+      [ ppShow (a :: Field Point) | FieldD _ a _ <- universeBi m ] ++
       [ ppShow (a :: Var Point) | AscribeD _ a _ <- universeBi m ] ++
       [ ppShow (a :: Var Point) | VarD _ a _ _ <- universeBi m ] ++
       [ ppShow (a :: Var Point) | ProcD _ a _ _ _ <- universeBi m ]
+
+rename :: Data a => Modid Point -> [(String,String)] -> [String] -> [String] -> a -> a
+rename n asTbl myDefs bnd_vars x =
+  transformBi (\(Con p s) -> Con (p :: Point) $ userF s) $
+  transformBi (\(Field p s) -> Field (p :: Point) $ userF s) $
+  transformBi (\(Var p s) -> Var (p :: Point) $ userF s) x
+    where
+      userF = usern asTbl (dModid n) myDefs bnd_vars
+
+bound_vars :: TopDecl Point -> [String]
+bound_vars x = map ppShow $ concat $
+  [ lhs_vars a | LetS _ a _ _ <- universeBi x ] ++
+  [ lhs_vars a | LetE _ a _ _ _ <- universeBi x ] ++
+  [ concatMap lhs_vars bs | LamE _ bs _ <- universeBi x ] ++
+  [ bs | CaseAlt _ _ bs _ <- universeBi x ] ++
+  [ [a] | DefaultAlt _ a _ <- universeBi x ] ++
+  [ concatMap lhs_vars bs | ProcD _ _ bs _ _ <- universeBi x ]
+
+lhs_vars :: Exp Point -> [Var Point]
+lhs_vars x = case x of
+  ArrayE _ bs -> concatMap lhs_vars bs
+  RecordE _ bs -> concat [ lhs_vars a | FieldD _ _ a <- bs ]
+  TupleE _ bs -> concatMap lhs_vars bs
+  AscribeE _ a _ -> lhs_vars a
+  VarE _ a -> [a]
+  CountE{} -> []
+  LitE{} -> []
+  _ -> error $ "unexpected lhs:" ++ ppShow x
 
 unCxt :: D.Type -> D.Type
 unCxt x = case x of
@@ -80,9 +109,10 @@ dModule (Module _ a b c ds) = D.Module (dModid a)
   (ws,xs) = partitionEithers $ map dTopDecl $ unAscribeDs ds
   (ys,zs) = partitionEithers ws
     
-usern :: [(String,String)] -> String -> [String] -> String -> String
-usern asTbl modId myDefs s = case a of
-  "" | b `elem` myDefs -> user_qual modId b
+usern :: [(String,String)] -> String -> [String] -> [String] -> String -> String
+usern asTbl modId myDefs bnd_vars s = case a of
+  "" | b `elem` bnd_vars -> b ++ "_"
+     | b `elem` myDefs  -> user_qual modId b
      | otherwise -> b ++ "_"
   _ -> user_qual c b
     where

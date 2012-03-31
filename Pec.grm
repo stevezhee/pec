@@ -48,8 +48,8 @@ data Exp
   | _ Exp5
 
 data Exp5
-  | LetS Exp4 DeclSym Exp -- sugar which can only appear in a block and lhs only var
-  | LetE "let" Exp4 DeclSym Exp "in" Exp
+  | LetS Exp0 DeclSym Exp -- sugar which can only appear in a block and lhs only var
+  | LetE "let" Exp0 DeclSym Exp "in" Exp
   | LamE "\\" Exp0List "->" Exp
   | StoreE Exp4 "<-" Exp
   | CaseE "case" Exp "of" "{" CaseAltList DefaultAlt "}"

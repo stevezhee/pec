@@ -1,2 +1,5 @@
 .shake.*
 dist
+*~
+*.exe
+.build
