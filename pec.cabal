@@ -1,6 +1,6 @@
 Name: pec
 
-Version: 0.2.2
+Version: 0.2.3
 
 Synopsis: pec embedded compiler
 
@@ -20,7 +20,7 @@ Category: Language
 
 Build-type: Simple
 
-data-files: Makefile, FAQ, DESIGN, lib/Data/Array.pec, lib/Data/Stack.pec, lib/Data/Deque.pec, lib/Data/Queue.pec, lib/Data/StrBuf.pec, lib/Prelude.pec, test_cases/TestStack.pec, test_cases/TestLoad.pec, test_cases/TestPrims.pec, test_cases/TestTuple.pec, test_cases/TestStrBuf.pec, test_cases/TestVariant.pec, test_cases/TestArray.pec, pec.cabal, THANKS, README, TODO, CHANGES, Pec.grm, Pir.grm, Pds.grm, C.grm, LLVM.grm, MkPec.hs
+data-files: Makefile, FAQ, DESIGN, lib/Data/Array.pec, lib/Data/Stack.pec, lib/Data/Deque.pec, lib/Data/Queue.pec, lib/Data/StrBuf.pec, lib/Prelude.pec, test_cases/TestStack.pec, test_cases/TestLoad.pec, test_cases/TestPrims.pec, test_cases/TestTuple.pec, test_cases/TestStrBuf.pec, test_cases/TestVariant.pec, test_cases/TestArray.pec, pec.cabal, THANKS, README, TODO, CHANGES, Pec.grm, Pir.grm, Pds.grm, C.grm, LLVM.grm, MkPec.hs, test_cases/euler/Euler1.pec, test_cases/euler/Euler10.pec, test_cases/euler/Euler11.pec, test_cases/euler/Euler12.pec, test_cases/euler/Euler13.pec, test_cases/euler/Euler14.pec, test_cases/euler/Euler145.pec, test_cases/euler/Euler2.pec, test_cases/euler/Euler3.pec, test_cases/euler/Euler4.pec, test_cases/euler/Euler5.pec, test_cases/euler/Euler6.pec, test_cases/euler/Euler7.pec, test_cases/euler/Euler8.pec, test_cases/euler/Euler9.pec, test_cases/TestArray.pec, test_cases/TestDeque.pec, test_cases/TestEmptyAlts.pec, test_cases/TestFun.pec, test_cases/TestLoad.pec, test_cases/TestPrims.pec, test_cases/TestQueue.pec, test_cases/TestStack.pec, test_cases/TestStrBuf.pec, test_cases/TestTuple.pec, test_cases/TestVariant.pec
 
 Cabal-version: >= 1.8
 
@@ -31,19 +31,19 @@ source-repository head
 Library
   Exposed-modules: Language.Pec.Par, Language.Pir.Abs, Language.C.Abs, Language.LLVM.Abs, Language.Pds.Abs, Pec.Base, Pec.C, Pec.LLVM, Pec.Desugar, Language.Pec.Abs, Pec.PUtil, Pec.HUtil, Pec.IUtil
   Other-modules: Paths_pec
-  Build-depends: base < 5, mtl, grm, Cabal, uniplate, derive, wl-pprint, syb, deepseq, array, containers, shake, cmdargs
+  Build-depends: base < 5, mtl, grm, Cabal, uniplate, derive, wl-pprint, syb, deepseq, array, containers, shake >= 0.2.9, cmdargs
 
 Executable pecgen
   Main-is: PecGen.hs
-  Build-depends: pec, base < 5, derive, wl-pprint, filepath, cmdargs, grm, Cabal, syb, deepseq, uniplate, mtl, directory, shake
+  Build-depends: pec, base < 5, derive, wl-pprint, filepath, cmdargs, grm, Cabal, syb, deepseq, uniplate, mtl, directory, shake >= 0.2.9
   Hs-Source-Dirs: src
 
 Executable pec
   Main-is: Pec.hs
-  Build-depends: pec, base < 5, old-time, process, filepath, directory, cmdargs, grm, Cabal, wl-pprint, syb, deepseq, uniplate, mtl, shake
+  Build-depends: pec, base < 5, old-time, process, filepath, directory, cmdargs, grm, Cabal, wl-pprint, syb, deepseq, uniplate, mtl, shake >= 0.2.9
   Hs-Source-Dirs: src
 
 Executable pecgencnt
   Main-is: PecGenCnt.hs
-  Build-depends: pec, base < 5, derive, cmdargs, grm, Cabal, wl-pprint, syb, deepseq, uniplate, mtl, filepath, shake
+  Build-depends: pec, base < 5, derive, cmdargs, grm, Cabal, wl-pprint, syb, deepseq, uniplate, mtl, filepath, shake >= 0.2.9
   Hs-Source-Dirs: src

@@ -20,8 +20,8 @@ data Args = Args
 copyright :: String
 copyright = "(C) Brett Letner 2011-2012"
 
-vers :: String
-vers = "0.2.2"
+version :: String
+version = "0.0.1"
 
 argsDesc :: Args
 argsDesc = Args
@@ -29,7 +29,7 @@ argsDesc = Args
   } &= summary summry &= program prog
 
 summry :: String
-summry = prog ++ " v" ++ vers ++ ", " ++ copyright
+summry = prog ++ " v" ++ version ++ ", " ++ copyright
 
 prog :: String
 prog = "MkPec.exe"
