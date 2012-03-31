@@ -21,6 +21,7 @@ todo
 - implement unfold for containers
 
 done
+- desugar 'as' import spec
 - update docs for release
 - release grm
 - properly create .ll files (i.e. with declare statements)
