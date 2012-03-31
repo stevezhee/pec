@@ -5,11 +5,7 @@ data ExportD
   | TypeEx "export" uident
   | VarEx "export" lident
 
-data ImportD | ImportD "import" uident AsSpec
-
-data AsSpec
-  | AsAS "as" uident
-  | EmptyAS 
+data ImportD | ImportD "import" uident
 
 data TypeD | TypeD "type" uident VarList "=" TyDecl
 data VarD | VarD lident DeclSym Exp

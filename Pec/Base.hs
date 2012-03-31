@@ -367,7 +367,7 @@ addGTyDecls xs = unsafePerformIO $ modifyMVar_ gTyDecls $ \ys ->
 defn :: Typed a => E a -> Define
 defn x = case unE x of
   DefE (TVar a0 t) b -> flip evalState initSt $ do
-    let a = if a0 == "main_" then "main" else a0
+    let a = if unqual_name a0 == "main_" then "main" else a0
     let (vs,c) = unLam b
     e <- atom c
     ss <- pop_block

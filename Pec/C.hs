@@ -100,9 +100,9 @@ funDecl a b cs = case cType a of
   where vs = map cDecl cs
   
 cFunDecl :: I.TVar -> FunDecl
-cFunDecl (I.TVar a b) = case b of
+cFunDecl tv@(I.TVar a b) = case b of
   I.Type "Fun_" xs -> funDecl (last xs) a (map (I.TVar "") $ init xs)
-  _ -> error "unused:cFunDecl:not TyFun"
+  _ -> error $ "unused:cFunDecl:not TyFun:" ++ ppShow tv
 
 cExp :: I.Exp -> Exp
 cExp x = case x of
@@ -334,7 +334,7 @@ isDeclS _ = False
 
 tName :: Module -> Module
 tName x = transformBi j $ transformBi i $ transformBi h $ transformBi g $
-          transformBi f x
+          transformBi k $ transformBi f x
   where
     f (Decl a b) = Decl a $ rName b
     f _ = error "unused:tName"
@@ -345,7 +345,9 @@ tName x = transformBi j $ transformBi i $ transformBi h $ transformBi g $
     i (EnumC a) = EnumC $ rName a
     j (EnumL a) = EnumL $ rName a
     j a = a
-    
+    k (TyName a) = TyName $ rName a
+    k a = a
+
 rName :: String -> String
 rName x = strip_underscore $ map f $ filter ((/=) '~') x
   where

@@ -328,7 +328,7 @@ dEnum st x = case x of
   "False_" -> FalseL
   "True_" -> TrueL
   _ -> case lookup x $ enums st of
-    Nothing -> error $ "unused:dLit:enum"
+    Nothing -> error $ "unused:dEnum:" ++ ppShow (enums st, x)
     Just i -> NmbrL $ show i
 
 dTVar :: St -> I.TVar -> TVar

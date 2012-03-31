@@ -5,7 +5,7 @@ import Data.Generics
 import Grm.Prims
 import Grm.Lex
 import Text.PrettyPrint.Leijen
-myLexemes = ["(",")",",","->","::",";","=","=>","VoidT","\\","as","enum","export","import","in","instance","let","module","newtype","of","record","switch","synonym","tagged","type","unit","{","|","}"]
+myLexemes = ["(",")",",","->","::",";","=","=>","VoidT","\\","enum","export","import","in","instance","let","module","newtype","of","record","switch","synonym","tagged","type","unit","{","|","}"]
 grmLexFilePath = lexFilePath myLexemes
 grmLexContents = lexContents myLexemes
 data Module 
@@ -16,11 +16,7 @@ data ExportD
   | VarEx  Lident
   deriving (Show,Eq,Ord,Data,Typeable)
 data ImportD 
-  = ImportD  Uident AsSpec
-  deriving (Show,Eq,Ord,Data,Typeable)
-data AsSpec 
-  = AsAS  Uident
-  | EmptyAS 
+  = ImportD  Uident
   deriving (Show,Eq,Ord,Data,Typeable)
 data TypeD 
   = TypeD  Uident VarList TyDecl
@@ -110,12 +106,7 @@ ppExportD x = case x of
 instance Pretty (ImportD ) where
   pretty = ppImportD
 ppImportD x = case x of
-  ImportD  v1 v2 -> text "import" <+> ppUident v1 <+> ppAsSpec v2
-instance Pretty (AsSpec ) where
-  pretty = ppAsSpec
-ppAsSpec x = case x of
-  AsAS  v1 -> text "as" <+> ppUident v1
-  EmptyAS   -> Text.PrettyPrint.Leijen.empty
+  ImportD  v1 -> text "import" <+> ppUident v1
 instance Pretty (TypeD ) where
   pretty = ppTypeD
 ppTypeD x = case x of

@@ -20,7 +20,7 @@ desugar :: Module Point -> D.Module
 desugar = rewriteBi dTyCxt . dModule . tModule
 
 tModule :: Module Point -> Module Point
-tModule m =
+tModule m@(Module _ n _ _ _) =
   rewriteBi dBlockE $ -- BAL: make it so we don't have to call these twice
   rewriteBi dConstructedE $
   rewriteBi dTupleE $
@@ -31,9 +31,19 @@ tModule m =
   transformBi (sortBy cmpFieldD) $ 
   transformBi (sortBy cmpFieldT) $ 
   transformBi (sortBy cmpConC) $ 
-  transformBi (\(Con p s) -> Con (p :: Point) $ usern s) $
-  transformBi (\(Field p s) -> Field (p :: Point) $ usern s) $
-  transformBi (\(Var p s) -> Var (p :: Point) $ usern s) m
+  transformBi (\(Con p s) -> Con (p :: Point) $ userF s) $
+  transformBi (\(Field p s) -> Field (p :: Point) $ userF s) $
+  transformBi (\(Var p s) -> Var (p :: Point) $ userF s) m
+  where
+    asTbl = [ (dModid b, dModid a ) | Import _ a (AsAS _ b) <- universeBi m ]
+    userF = usern asTbl (dModid n) myDefs
+    myDefs =
+      -- [ ppShow (a :: Var Point) | ExternD _ _ a _ <- universeBi m ] ++
+      [ ppShow (a :: Con Point) | TypeD _ a _ _ <- universeBi m ] ++
+      [ ppShow (a :: Con Point) | TypeD0 _ a _ <- universeBi m ] ++
+      [ ppShow (a :: Var Point) | AscribeD _ a _ <- universeBi m ] ++
+      [ ppShow (a :: Var Point) | VarD _ a _ _ <- universeBi m ] ++
+      [ ppShow (a :: Var Point) | ProcD _ a _ _ _ <- universeBi m ]
 
 unCxt :: D.Type -> D.Type
 unCxt x = case x of
@@ -70,17 +80,29 @@ dModule (Module _ a b c ds) = D.Module (dModid a)
   (ws,xs) = partitionEithers $ map dTopDecl $ unAscribeDs ds
   (ys,zs) = partitionEithers ws
     
-usern :: String -> String
-usern s = case a of
-  "" -> b ++ "_"
-  _ -> a ++ "." ++ b ++ "_"
+usern :: [(String,String)] -> String -> [String] -> String -> String
+usern asTbl modId myDefs s = case a of
+  "" | b `elem` myDefs -> user_qual modId b
+     | otherwise -> b ++ "_"
+  _ -> user_qual c b
+    where
+      c = case [ y | (x,y) <- asTbl, x == a ] of
+            [] -> a
+            [d] -> d
+            _ -> error $ "ambiguous qualifier:" ++ a
   where
-  (a,b) = breakQual s
+  (a,b) = break_qual s
+  user_qual x y = x ++ "." ++ y ++ "_"
 
-breakQual :: String -> (String,String)
-breakQual s = (vModid $ qual $ init ss, last ss)
+user_unqual :: String -> String
+user_unqual s = case unqual s of
+  [_] -> s ++ "_"
+  _ -> error $ "unexpected qualified name:" ++ s
+
+break_qual :: String -> (String,String)
+break_qual s = (vModid $ qual $ init ss, last ss)
   where ss = unqual s
-  
+
 vModid :: String -> String
 vModid s
   | null s = s
@@ -167,9 +189,10 @@ rptr_ :: D.Type -> D.Type
 rptr_ a = let p = uId a "p" in rptr p a
 
 fun2 :: Pretty a => String -> String -> a -> D.Type -> D.VarD
-fun2 a x b c = D.VarD (lowercase s ++ a) D.Macro $
+fun2 a x b c = D.VarD (lc_con s ++ a) D.Macro $
   D.AscribeE (D.AppE (D.VarE x) (dExp $ stringE s)) c
-  where s = ppShow b
+  where
+    s = ppShow b
 
 fun :: Pretty a => String -> a -> D.Type -> D.VarD
 fun a = fun2 a a
@@ -181,19 +204,15 @@ dSpec a b@(D.TypeD c _ _) = case a of
   Both p -> dSpec (Decon p) b ++ map exVarD (constrs b)
 
 un :: Pretty a => a -> String
-un x = lowercase (ppShow x) ++ "un"
+un x = lc_con (ppShow x) ++ "un"
 
 fld :: Pretty a => a -> String
 fld x = ppShow x ++ "fld"
 
 dImportDecls :: ImportDecls Point -> [D.ImportD]
 dImportDecls x = case x of
-  ImpListD _ a -> map f a
+  ImpListD _ bs -> [ D.ImportD (dModid a) | Import _ a _ <- bs ]
   ImpNoneD _ -> []
-  where
-  f y = case y of
-    Import _ a (AsAS _ b) -> D.ImportD (dModid a) (D.AsAS $ dModid b)
-    Import _ a (EmptyAS _) -> D.ImportD (dModid a) D.EmptyAS
         
 dVar :: Pretty a => a -> D.Var
 dVar = D.Var . ppShow
@@ -261,9 +280,9 @@ isEnumC (ConC _ _ xs) = null xs
 
 dTyVar :: TyVar Point -> D.Type
 dTyVar x = case x of
-  VarTV _ a -> D.TyVarT $ usern a
-  CntTV _ a -> D.TyCxt [D.Cxt "Count" [D.Var s]] $ D.TyVarT s
-    where s = usern a
+  VarTV _ a -> D.TyVarT $ user_unqual a
+  CntTV _ a  -> D.TyCxt [D.Cxt "Count" [D.Var s]] $ D.TyVarT s
+    where s = user_unqual a
 
 dDeclSym :: DeclSym Point -> D.DeclSym
 dDeclSym x = case x of
@@ -437,7 +456,13 @@ dLit suf x = case x of
   CharL _ a -> D.LitE $ D.CharL a
   StringL _ a -> D.LitE $ D.StringL a
   NmbrL _ a -> D.LitE $ D.NmbrL a
-  EnumL{} -> dExp $ varE $ lowercase $ ppShow x ++ suf
+  EnumL{} -> dExp $ varE $ lc_con $ ppShow x ++ suf
+
+lc_con :: String -> String
+lc_con x = case unqual x of
+  [a] -> lowercase a
+  [b,a] -> b ++ "." ++ lowercase a
+  ys -> error $ "unused:lc_con:" ++ show ys
 
 opE :: Pretty a => a -> Exp Point
 opE a = varE $ concatMap f $ ppShow a

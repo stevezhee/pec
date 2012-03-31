@@ -65,7 +65,7 @@ hModule outdir cnts (P.Module a bs cs ds es fs) =
    map hInstD es ++
    catMaybes (map hTyped ds) ++
    catMaybes (map hTagged ds) ++
-   map (hVarD a) fs)
+   map hVarD fs)
 
 hInstD :: P.InstD -> Decl
 hInstD (P.InstD a b) = H.InstDecl nl [] (H.qname a) [hType b] []
@@ -74,7 +74,7 @@ mainD :: FilePath -> String -> [ImportD] -> [VarD] -> Decl
 mainD outdir a bs xs = hNameBind "main" $ apps (var "dModule")
   [ hString outdir
   , hString a
-  , H.List [ hString b | ImportD b _ <- bs]
+  , H.List [ hString b | ImportD b <- bs]
   , H.List $ catMaybes $ map f xs
   ]
   where
@@ -97,7 +97,7 @@ hDataDecl (TypeD a bs c) = case c of
   TySyn t -> TypeDecl nl n vs (hType t)
   _ -> DataDecl nl DataType [] n vs [] []
   where
-  n = H.name a
+  n = H.name $ unqual_name a
   vs = map hUnkindedVar bs
 
 typeTy :: String -> [Var] -> P.Type
@@ -193,33 +193,26 @@ hExport x = case x of
   VarEx a -> EVar (qname a)
 
 hImport_ :: String -> ImportDecl
-hImport_ a = hImport (ImportD a EmptyAS)
+hImport_ = hImport . ImportD
 
 hImport :: ImportD -> ImportDecl
-hImport (ImportD a b) = ImportDecl
+hImport (ImportD a) = ImportDecl
   { importLoc = nl
   , importModule = ModuleName a
-  , importQualified = x
+  , importQualified = False
   , importSrc = False
   , importPkg = Nothing
-  , importAs = Just $ ModuleName y
+  , importAs = Nothing
   , importSpecs = Nothing
   }
-  where
-  (x,y) = case b of
-      EmptyAS -> (False,a)
-      AsAS c -> (True,c)
 
-hVarD :: String -> VarD -> Decl
-hVarD m (VarD a b c) = case b of
+hVarD :: VarD -> Decl
+hVarD (VarD a b c) = case b of
   Macro -> hNameBind a (hExp True c)
-  Define -> hNameBind a $ term "defE" [hString n, hExp False c]
-    where 
-      n | a == "main_" = a
-        | otherwise = m ++ a
+  Define -> hNameBind a $ term "defE" [hString a, hExp False c]
                       
 hNameBind :: String -> H.Exp -> Decl
-hNameBind a = nameBind nl (Ident a)
+hNameBind a = nameBind nl (Ident $ lowercase $ unqual_name a)
 
 hChar :: Char -> H.Exp
 hChar = Lit . Char

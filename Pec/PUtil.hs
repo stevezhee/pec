@@ -44,7 +44,7 @@ has_suffix :: Eq a => [a] -> [a] -> Bool
 has_suffix a b = drop (length a - length b) a == b
 
 imports :: D.Module -> [String]
-imports (D.Module _ _ xs _ _ _) = [ a | D.ImportD a _ <- xs ]
+imports (D.Module _ _ xs _ _ _) = [ a | D.ImportD a <- xs ]
 
 modid :: D.Module -> String
 modid (D.Module n _ _ _ _ _) = n
@@ -69,6 +69,11 @@ und_to_path = joinPath . splitBy ((==) '_')
 
 unqual :: String -> [String]
 unqual = splitBy ((==) '.')
+
+unqual_name :: String -> String
+unqual_name s = case unqual s of
+  [] -> ""
+  xs -> last xs
 
 qual :: [String] -> String
 qual = concat . intersperse "."

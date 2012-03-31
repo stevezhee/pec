@@ -21,7 +21,6 @@ import Language.Pds.Abs
   "=>" { TSymbol _ "=>" }
   "VoidT" { TSymbol _ "VoidT" }
   "\\" { TSymbol _ "\\" }
-  "as" { TSymbol _ "as" }
   "enum" { TSymbol _ "enum" }
   "export" { TSymbol _ "export" }
   "import" { TSymbol _ "import" }
@@ -55,11 +54,8 @@ ExportD
   : "export" uident {TypeEx   (unTUident $2)}
   | "export" lident {VarEx   (unTLident $2)}
 ImportD
-  : "import" uident AsSpec {ImportD   (unTUident $2) $3}
+  : "import" uident {ImportD   (unTUident $2)}
   
-AsSpec
-  : "as" uident {AsAS   (unTUident $2)}
-  | {EmptyAS }
 TypeD
   : "type" uident VarList "=" TyDecl {TypeD   (unTUident $2) $3  $5}
   
