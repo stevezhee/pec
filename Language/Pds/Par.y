@@ -21,6 +21,7 @@ import Language.Pds.Abs
   "=>" { TSymbol _ "=>" }
   "VoidT" { TSymbol _ "VoidT" }
   "\\" { TSymbol _ "\\" }
+  "count" { TSymbol _ "count" }
   "enum" { TSymbol _ "enum" }
   "export" { TSymbol _ "export" }
   "import" { TSymbol _ "import" }
@@ -48,13 +49,16 @@ import Language.Pds.Abs
   number { TNumber _ _ }
 %%
 Module
-  : "module" uident "{" ExportDList ImportDList TypeDList InstDList VarDList "}" {Module   (unTUident $2)  $4 $5 $6 $7 $8 }
+  : "module" uident "{" ExportDList ImportDList CountDList TypeDList InstDList VarDList "}" {Module   (unTUident $2)  $4 $5 $6 $7 $8 $9 }
   
 ExportD
   : "export" uident {TypeEx   (unTUident $2)}
   | "export" lident {VarEx   (unTLident $2)}
 ImportD
   : "import" uident {ImportD   (unTUident $2)}
+  
+CountD
+  : "count" number {CountD   (unTNumber $2)}
   
 TypeD
   : "type" uident VarList "=" TyDecl {TypeD   (unTUident $2) $3  $5}
@@ -109,7 +113,7 @@ EnumC
   : uident {EnumC  (unTUident $1)}
   
 FieldT
-  : uident "::" Type {FieldT  (unTUident $1)  $3}
+  : lident "::" Type {FieldT  (unTLident $1)  $3}
   
 Var
   : lident {Var  (unTLident $1)}
@@ -138,6 +142,12 @@ TypeDList
 REV_TypeDList
   : TypeD ";" {[$1]}
   | REV_TypeDList TypeD ";" {$2 : $1}
+CountDList
+  : REV_CountDList {reverse $1}
+  | {- empty -} { [] }
+REV_CountDList
+  : CountD ";" {[$1]}
+  | REV_CountDList CountD ";" {$2 : $1}
 InstDList
   : REV_InstDList {reverse $1}
   | {- empty -} { [] }
@@ -182,7 +192,7 @@ REV_TypeList
   | REV_TypeList Type {$2 : $1}
 CxtList
   : REV_CxtList {reverse $1}
-  
+  | {- empty -} { [] }
 REV_CxtList
   : Cxt {[$1]}
   | REV_CxtList "," Cxt {$3 : $1}

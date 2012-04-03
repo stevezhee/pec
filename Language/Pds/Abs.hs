@@ -5,11 +5,11 @@ import Data.Generics
 import Grm.Prims
 import Grm.Lex
 import Text.PrettyPrint.Leijen
-myLexemes = ["(",")",",","->","::",";","=","=>","VoidT","\\","enum","export","import","in","instance","let","module","newtype","of","record","switch","synonym","tagged","type","unit","{","|","}"]
+myLexemes = ["(",")",",","->","::",";","=","=>","VoidT","\\","count","enum","export","import","in","instance","let","module","newtype","of","record","switch","synonym","tagged","type","unit","{","|","}"]
 grmLexFilePath = lexFilePath myLexemes
 grmLexContents = lexContents myLexemes
 data Module 
-  = Module  Uident ExportDList ImportDList TypeDList InstDList VarDList
+  = Module  Uident ExportDList ImportDList CountDList TypeDList InstDList VarDList
   deriving (Show,Eq,Ord,Data,Typeable)
 data ExportD 
   = TypeEx  Uident
@@ -17,6 +17,9 @@ data ExportD
   deriving (Show,Eq,Ord,Data,Typeable)
 data ImportD 
   = ImportD  Uident
+  deriving (Show,Eq,Ord,Data,Typeable)
+data CountD 
+  = CountD  Number
   deriving (Show,Eq,Ord,Data,Typeable)
 data TypeD 
   = TypeD  Uident VarList TyDecl
@@ -77,7 +80,7 @@ data EnumC
   = EnumC  Uident
   deriving (Show,Eq,Ord,Data,Typeable)
 data FieldT 
-  = FieldT  Uident Type
+  = FieldT  Lident Type
   deriving (Show,Eq,Ord,Data,Typeable)
 data Var 
   = Var  Lident
@@ -86,6 +89,7 @@ type ExportDList  = [ExportD ]
 type ImportDList  = [ImportD ]
 type VarDList  = [VarD ]
 type TypeDList  = [TypeD ]
+type CountDList  = [CountD ]
 type InstDList  = [InstD ]
 type SwitchAltList  = [SwitchAlt ]
 type EnumCList  = [EnumC ]
@@ -97,7 +101,7 @@ type CxtList  = [Cxt ]
 instance Pretty (Module ) where
   pretty = ppModule
 ppModule x = case x of
-  Module  v1 v2 v3 v4 v5 v6 -> text "module" <+> ppUident v1 <+> text "{" <+> ppExportDList v2 <+> ppImportDList v3 <+> ppTypeDList v4 <+> ppInstDList v5 <+> ppVarDList v6 <+> text "}"
+  Module  v1 v2 v3 v4 v5 v6 v7 -> text "module" <+> ppUident v1 <+> text "{" <+> ppExportDList v2 <+> ppImportDList v3 <+> ppCountDList v4 <+> ppTypeDList v5 <+> ppInstDList v6 <+> ppVarDList v7 <+> text "}"
 instance Pretty (ExportD ) where
   pretty = ppExportD
 ppExportD x = case x of
@@ -107,6 +111,10 @@ instance Pretty (ImportD ) where
   pretty = ppImportD
 ppImportD x = case x of
   ImportD  v1 -> text "import" <+> ppUident v1
+instance Pretty (CountD ) where
+  pretty = ppCountD
+ppCountD x = case x of
+  CountD  v1 -> text "count" <+> ppNumber v1
 instance Pretty (TypeD ) where
   pretty = ppTypeD
 ppTypeD x = case x of
@@ -181,7 +189,7 @@ ppEnumC x = case x of
 instance Pretty (FieldT ) where
   pretty = ppFieldT
 ppFieldT x = case x of
-  FieldT  v1 v2 -> ppUident v1 <+> text "::" <+> ppType v2
+  FieldT  v1 v2 -> ppLident v1 <+> text "::" <+> ppType v2
 instance Pretty (Var ) where
   pretty = ppVar
 ppVar x = case x of
@@ -190,6 +198,7 @@ ppExportDList = ppList ppExportD Terminator ";" Vert
 ppImportDList = ppList ppImportD Terminator ";" Vert
 ppVarDList = ppList ppVarD Terminator ";" Vert
 ppTypeDList = ppList ppTypeD Terminator ";" Vert
+ppCountDList = ppList ppCountD Terminator ";" Vert
 ppInstDList = ppList ppInstD Terminator ";" Vert
 ppSwitchAltList = ppList ppSwitchAlt Terminator ";" Vert
 ppEnumCList = ppList ppEnumC Separator "|" Horiz

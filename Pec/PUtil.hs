@@ -15,11 +15,12 @@ import Distribution.Text
 import Grm.Layout
 import Grm.Lex
 import Grm.Prims
-import Language.Pec.Par
 import Paths_pec
 import System.Console.CmdArgs
 import qualified Language.Pds.Abs as D
+import qualified Language.Pds.Par as PD
 import qualified Language.Pec.Abs as P
+import qualified Language.Pec.Par as PP
 
 copyright :: String
 copyright = "(C) Brett Letner 2011-2012"
@@ -30,24 +31,38 @@ vers = display version
 getLibDir :: IO FilePath
 getLibDir = liftM takeDirectory $ getDataFileName "lib/Prelude.pec"
 
-parse_pec :: FilePath -> IO (P.Module Point)
-parse_pec fn = do
-  ts <- P.grmLexFilePath fn
-  m@(P.Module _ a _ _ _) <-
-    return $ grmParse $ layout $ filter notWSToken ts
-  if ((splitDirectories $ dropExtension $ normalise fn) `has_suffix`
-      (unqual $ ppShow a))
+parse_m ::
+  (FilePath -> IO [Token Point]) -> ([Token Point] -> a) -> (a -> String) -> FilePath -> IO a
+parse_m lexF parF modidF fn = do
+  ts <- lexF fn
+  m <- return $ parF $ filter notWSToken ts
+  let n = modidF m
+  if ((splitDirectories $ dropExtension $ normalise fn) `has_suffix` unqual n)
      then return m
-     else error $ "module name mismatch:" ++ fn ++ ":" ++ ppShow a
+     else error $ "module name mismatch:" ++ fn ++ ":" ++ n
+  
+parse_pec :: FilePath -> IO (P.Module Point)
+parse_pec = parse_m P.grmLexFilePath (PP.grmParse . layout) modid_p
+  
+parse_pds :: FilePath -> IO D.Module
+parse_pds = parse_m D.grmLexFilePath PD.grmParse (init . modid_d)
+
+readFileDeps :: FilePath -> IO ([String],[String])
+readFileDeps fn = do
+  D.Module _ _ xs ys _ _ _ <- parse_pds fn
+  return ([ init x | D.ImportD x <- xs], [ y | D.CountD y <- ys])
   
 has_suffix :: Eq a => [a] -> [a] -> Bool
 has_suffix a b = drop (length a - length b) a == b
 
 imports :: D.Module -> [String]
-imports (D.Module _ _ xs _ _ _) = [ a | D.ImportD a <- xs ]
+imports (D.Module _ _ xs _ _ _ _) = [ a | D.ImportD a <- xs ]
 
-modid :: D.Module -> String
-modid (D.Module n _ _ _ _ _) = n
+modid_d :: D.Module -> String
+modid_d (D.Module n _ _ _ _ _ _) = n
+
+modid_p :: P.Module a -> String
+modid_p (P.Module _ n _ _ _) = ppShow n
 
 counts :: P.Module Point -> [Integer]
 counts (P.Module _ _ _ _ xs) = nub $
@@ -89,12 +104,6 @@ splitBy p = loop [] []
         
 summarize :: String -> String
 summarize prog = prog ++ " v" ++ vers ++ ", " ++ copyright
-
-readFileDeps :: FilePath -> IO ([String],[Integer])
-readFileDeps = liftM read . readFile
-
-writeFileDeps :: FilePath -> ([String],[Integer]) -> IO ()
-writeFileDeps fn = writeFileBinary fn . show
 
 data Arch = C | LLVM deriving (Show, Data, Typeable)
 

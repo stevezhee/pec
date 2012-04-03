@@ -60,6 +60,8 @@ gen_files =
     , "Language/Pec/Par.hs"
     , "Language/Pec/Par.y"
     , "Language/Pds/Abs.hs"
+    , "Language/Pds/Par.hs"
+    , "Language/Pds/Par.y"
     , "Language/Pir/Abs.hs"
     , "Language/C/Abs.hs"
     , "Language/LLVM/Abs.hs"

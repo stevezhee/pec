@@ -1,11 +1,12 @@
 data Module
-  | Module "module" uident "{" ExportDList ImportDList TypeDList InstDList VarDList "}"
+  | Module "module" uident "{" ExportDList ImportDList CountDList TypeDList InstDList VarDList "}"
 
 data ExportD
   | TypeEx "export" uident
   | VarEx "export" lident
 
 data ImportD | ImportD "import" uident
+data CountD | CountD "count" number
 
 data TypeD | TypeD "type" uident VarList "=" TyDecl
 data VarD | VarD lident DeclSym Exp
@@ -56,7 +57,7 @@ data ConC | ConC uident Type
 
 data EnumC | EnumC uident
 
-data FieldT | FieldT uident "::" Type
+data FieldT | FieldT lident "::" Type
 
 data Var | Var lident
 
@@ -64,6 +65,7 @@ list ExportDList ExportD empty terminator ";" vert
 list ImportDList ImportD empty terminator ";" vert
 list VarDList VarD empty terminator ";" vert
 list TypeDList TypeD empty terminator ";" vert
+list CountDList CountD empty terminator ";" vert
 list InstDList InstD empty terminator ";" vert
 list SwitchAltList SwitchAlt empty terminator ";" vert
 list EnumCList EnumC nonempty separator "|" horiz
@@ -71,4 +73,4 @@ list ConCList ConC nonempty separator "|" horiz
 list FieldTList FieldT nonempty separator "," horiz
 list VarList Var empty separator "" horiz
 list TypeList Type empty separator "" horiz
-list CxtList Cxt nonempty separator "," horiz
+list CxtList Cxt empty separator "," horiz

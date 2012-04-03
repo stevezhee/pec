@@ -29,7 +29,7 @@ source-repository head
   location: git://github.com/stevezhee/pec.git
 
 Library
-  Exposed-modules: Language.Pec.Par, Language.Pir.Abs, Language.C.Abs, Language.LLVM.Abs, Language.Pds.Abs, Pec.Base, Pec.C, Pec.LLVM, Pec.Desugar, Language.Pec.Abs, Pec.PUtil, Pec.HUtil, Pec.IUtil
+  Exposed-modules: Language.Pec.Par, Language.Pds.Par, Language.Pir.Abs, Language.C.Abs, Language.LLVM.Abs, Language.Pds.Abs, Pec.Base, Pec.C, Pec.LLVM, Pec.Desugar, Language.Pec.Abs, Pec.PUtil, Pec.HUtil, Pec.IUtil
   Other-modules: Paths_pec
   Build-depends: base < 5, mtl, grm, Cabal, uniplate, derive, wl-pprint, syb, deepseq, array, containers, shake >= 0.2.9, cmdargs
 

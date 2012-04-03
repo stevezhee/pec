@@ -102,8 +102,8 @@ dTyCxt x = case x of
   _ -> Nothing
 
 dModule :: Module Point -> D.Module
-dModule (Module _ a b c ds) = D.Module (dModid a)
-  (dExportDecls ys xs b) (dImportDecls c) ys zs
+dModule m@(Module _ a b c ds) = D.Module (dModid a)
+  (dExportDecls ys xs b) (dImportDecls c) [ D.CountD $ show i | i <- counts m ] ys zs
   (concatMap constrs ys ++ concatMap deconstrs ys ++ xs)
   where
   (ws,xs) = partitionEithers $ map dTopDecl $ unAscribeDs ds

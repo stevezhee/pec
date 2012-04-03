@@ -41,24 +41,23 @@ main = do
     [] -> putStrLn $ summarize prog
     [fn] -> do
       m0 <- parse_pec fn
-      let cnts = counts m0
       m1 <- return $ desugar m0
-      let n = modid m1
+      let n = modid_d m1
       createDirectoryIfMissing True $ dir args
-      writeFileDeps (joinPath [dir args, init n ++ ".dep"]) $
-        (map init $ imports m1, cnts)
-      m <- return $ hModule (dir args) cnts m1
+      writeFileBinary (joinPath [dir args, init n ++ ".pds"]) $
+        ppShow m1
+      m <- return $ hModule (dir args) m1
       writeFileBinary (joinPath [dir args, n ++ ".hs"]) $
         prettyPrint m
     _ -> error "expecting exactly one input file"
 
-hModule :: FilePath -> [Integer] -> P.Module -> H.Module
-hModule outdir cnts (P.Module a bs cs ds es fs) =
+hModule :: FilePath -> P.Module -> H.Module
+hModule outdir (P.Module a bs cs hs ds es fs) =
   H.Module nl (ModuleName a)
   hPragmas
   Nothing
   (Just $ map hExport bs)
-  (map hImport_ (["Pec.Base"] ++ map ((++) "Cnt" . show) cnts) ++
+  (map hImport_ (["Pec.Base"] ++ [ "Cnt" ++ h | CountD h <- hs]) ++
    map hImport cs)
   (mainD outdir a cs fs :
    map hDataDecl ds ++

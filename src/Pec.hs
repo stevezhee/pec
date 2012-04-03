@@ -85,9 +85,9 @@ main = do
 
     "//*.exe" *> \outFn -> case march a of
       C -> do
-        let depFn = buildPath $ replaceExtension outFn "dep"
-        need [depFn]
-        xs <- loadFileDeps depFn
+        let pdsFn = buildPath $ replaceExtension outFn "pds"
+        need [pdsFn]
+        xs <- loadFileDeps pdsFn
         let fns = [ replaceExtension x "o" | x <- xs ]
         need fns
         system' "gcc" $
@@ -109,9 +109,9 @@ main = do
       system' "opt" [ "-o", outFn, "-std-compile-opts", "-std-link-opts", fn ]
   
     "//*.bca" *> \outFn -> do
-      let depFn = replaceExtension outFn "dep"
-      need [depFn]
-      xs <- loadFileDeps depFn
+      let pdsFn = replaceExtension outFn "pds"
+      need [pdsFn]
+      xs <- loadFileDeps pdsFn
       let fns = [ replaceExtension x "bc" | x <- xs ]
       need fns
       system' "llvm-link" $ [ "-o", outFn ] ++ fns
@@ -131,20 +131,20 @@ main = do
       system' "llvm-as" ["-o", outFn, fn ]
 
     "//*_.hs" *> \hsOut -> do
-      need [(init $ dropExtension hsOut) ++ ".dep"]
+      need [(init $ dropExtension hsOut) ++ ".pds"]
 
-    "//*.dep" *> \depOut -> do
+    "//*.pds" *> \pdsOut -> do
       let fn = dropDirectory1
-            (und_to_path (dropExtension depOut) ++ ".pec")
+            (und_to_path (dropExtension pdsOut) ++ ".pec")
       mFn <- liftIO $ findFile idirs fn
       case mFn of
         Nothing -> error $ "unknown file:" ++ fn
         Just fn1 -> do
           need [fn1] -- BAL: needed?
           system' "pecgen" ["-d", buildDir, fn1]
-          (xs,ys) <- liftIO $ readFileDeps depOut
-          need [ buildPath $ x ++ ".dep" | x <- xs ]
-          need [ buildPath $ "Cnt" ++ show y ++ ".hs" | y <- ys ]
+          (xs,ys) <- liftIO $ readFileDeps pdsOut
+          need [ buildPath $ x ++ ".pds" | x <- xs ]
+          need [ buildPath $ "Cnt" ++ y ++ ".hs" | y <- ys ]
 
     "//Cnt*.hs" *> \outFn -> system' "pecgencnt" [outFn]
       
@@ -160,7 +160,7 @@ loadFileDeps fn0 = loop [] [fn0]
     | y `elem` xs = loop xs ys
     | otherwise = do
         (zs,_) <- liftIO $ readFileDeps y
-        loop (y : xs) ([ buildPath $ z ++ ".dep" | z <- zs ] ++ ys)
+        loop (y : xs) ([ buildPath $ z ++ ".pds" | z <- zs ] ++ ys)
                      
 buildPath :: FilePath -> FilePath
 buildPath x = buildDir </> x
